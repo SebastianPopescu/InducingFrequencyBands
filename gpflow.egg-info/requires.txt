@@ -1,0 +1,19 @@
+check_shapes>=1.0.0
+deprecated
+multipledispatch>=0.6
+numpy
+packaging
+scipy
+setuptools>=41.0.0
+tabulate
+tensorflow-probability>=0.12.0
+typing_extensions
+
+[:platform_system != "Darwin" or platform_machine != "arm64"]
+tensorflow>=2.4.0
+
+[:platform_system == "Darwin" and platform_machine == "arm64"]
+tensorflow-macos>=2.4.0
+
+[ImageToTensorBoard]
+matplotlib
