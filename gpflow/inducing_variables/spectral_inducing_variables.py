@@ -75,7 +75,7 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
         self.kern = kern
 
         """
-
+        #TODO -- I think this might cause some problems with shape_check in posteriors.py
         if not isinstance(means, (tf.Variable, tfp.util.TransformedVariable)):
             means = Parameter(means, transform=positive())
         self.means = means

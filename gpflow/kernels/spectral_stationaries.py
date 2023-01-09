@@ -330,10 +330,10 @@ class SpectralStationary(SpectralKernel):
     dimension, otherwise the kernel is isotropic (has a single lengthscale).
     """
 
-    #TODO -- reintroduce check_shapes eventually
+    #TODO -- reintroduce check_shapes
     #@check_shapes(
     #    "variance: []",
-    #    "lengthscales: [broadcast n_active_dims]"e,
+    #    "lengthscales: [broadcast n_active_dims]",
     #)
     def __init__(
         self, 
@@ -391,7 +391,7 @@ class SpectralStationary(SpectralKernel):
         
         """
 
-        For the general Spectral kernel case, but not for Inducing Frequency Bands, nor GP-MultiSinc
+        #NOTE -- For the general Spectral kernel case, but not for Inducing Frequency Bands, nor GP-MultiSinc
         :param X: expected shape [N, D]
         :param self.means: expected shape [D, ]
         
@@ -493,13 +493,7 @@ class AnisotropicSpectralStationary(SpectralStationary):
     @inherit_check_shapes
     def K(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:
 
-        print('--- inside K of AnisotropicSpectralStationary -----')
-
-        plm = self.scaled_difference_matrix(X, X2)
-        print(plm)
-
         return self.K_d(self.scaled_difference_matrix(X, X2))
-
 
     @check_shapes(
         "X: [batch..., N, D]",

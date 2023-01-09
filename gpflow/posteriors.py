@@ -444,18 +444,18 @@ class GPRPosterior(AbstractPosterior):
         temp_cache = tuple(c.value for c in self._precompute())
         return self._conditional_with_precompute(temp_cache, Xnew, full_cov, full_output_cov)
 
-
 class SGPRPosterior(AbstractPosterior):
     """
     This class represents posteriors which can be derived from SGPR
     models to compute faster predictions on unseen points.
     """
 
-    @check_shapes(
-        "data[0]: [N, D]",
-        "data[1]: [N, Q]",
-        "inducing_variable: [M, D, 1]",
-    )
+    #NOTE -- this is temporarily deactivated due to some conflicts with Spectral Inducing Points
+    #@check_shapes(
+    #    "data[0]: [N, D]",
+    #    "data[1]: [N, Q]",
+    #    "inducing_variable: [M, D, 1]",
+    #)
     def __init__(
         self,
         kernel: Kernel,

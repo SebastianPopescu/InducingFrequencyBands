@@ -18,13 +18,14 @@ from .spectral_utils import sinc
 from ..utilities.ops import difference_matrix, square_distance, batched_difference_matrix
 
 
-#NOTE -- this is the Sinc kernel basically
-#TODO -- we should make this anisotropic
+#NOTE -- this is basically the Sinc kernel
 class SpectralBlock(AnisotropicSpectralStationary):
     """
     The primitive kernel defined by a constant spectral density spanning a finite bandwidth.
-    This is essentially used for the GP-SINC model introduced in Tobar (2019)
+    This is essentially used for the GP-SINC model introduced in Tobar (2019) [1].
     Works with multi-dimensional data by taking a product over symmetrical rectangles for each input dimension
+    
+    [1]: Tobar F. Band-limited Gaussian processes: The sinc kernel. Advances in Neural Information Processing Systems. 2019;32.
     """
 
     def __init__(
@@ -35,28 +36,31 @@ class SpectralBlock(AnisotropicSpectralStationary):
         active_dims=None,
     ):
         """
-        :param powers: The variance associated with the block.
-        :param means: Defined as the inverse of the mean frequency.
+        :param powers: The variance/magnitude associated with the block.
+        :param means: Defined as the mean frequency.
         :param bandwidths: The frequency range spanned by the spectral block.
         :param active_dims: TODO missing param description
         """
-
-        print('----- inside the init of SpectralBlock')
-        print(powers)
-        print(means.shape)
-        print(bandwidths.shape)
-
         super().__init__(powers=powers, means=means, bandwidths=bandwidths, active_dims=active_dims)
 
     def K_d(self, d):
         """
-        #TODO -- update the documentation here
-        :param d: expected_shape [N1, N2, D]
+        
+        Implements anisotropic version of Sink kernel.
 
+        Computes:
+            SK(d) = σ2 sinc(∆t) cos(2πξd)
+            where:
+             σ2 - magnitude
+             ∆ - bandwidth
+             ξ - frequency
+        Remainder: because of scale function, in our implementation d is already multipled by frequency/means             
+
+        :param d: expected_shape [N1, N2, D]
         returns: expected_shape [N1,N2]
         """
 
-        print('----- inside K_d ------')
+        print('----- inside K_d of SpectralBlock ------')
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) #[N1, N2]    
         print(cos_term)
 
@@ -76,15 +80,12 @@ class SpectralBlock(AnisotropicSpectralStationary):
 
         return output
 
-
-
-#NOTE -- this is a cosine kernel, which corresponds to the PSD being just a dirac delta
-
+#NOTE -- this is a cosine kernel, which corresponds to the PSD being just a Dirac delta
 class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
     """
-    The primitive kernel defined by a constant spectral density spanning a finite bandwidth.
-    This is essentially used for the GP-SINC model introduced in Tobar (2019)
-    Works with multi-dimensional data by taking a product over symmetrical rectangles for each input dimension
+
+    The primitive kernel defined by a constant spectral density spanning an infinitesimally small bandwidth (Dirac delta).
+
     """
 
     def __init__(
@@ -96,16 +97,10 @@ class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
     ):
         """
         :param powers: The variance associated with the block.
-        :param means: Defined as the inverse of the mean frequency.
+        :param means: Defined as the mean frequency.
         :param bandwidths: The frequency range spanned by the spectral block.
         :param active_dims: TODO missing param description
         """
-
-        print('----- inside the init of SpectralBlock')
-        print(powers)
-        print(means.shape)
-        print(bandwidths.shape)
-
         super().__init__(powers=powers, means=means, bandwidths=bandwidths, active_dims=active_dims)
 
     def K_d(self, d):
@@ -116,23 +111,23 @@ class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
         returns: expected_shape [N1,N2]
         """
 
-        print('----- inside K_d ------')
+        print('----- inside K_d of  SpectralDiracDeltaBlock ------')
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) #[N1, N2]    
         print(cos_term)
-
-        #pre_multiplier = tf.transpose(self.bandwidths / self.means) # [1, D]
-        #print(pre_multiplier)
 
         output = self.powers * cos_term
 
         return output
 
 
-#NOTE -- this is to be only used for the InducingFrequencyBands model or GP-MultiSinc
+#NOTE -- this is to be only used for the InducingFrequencyBands model or GP-MultiSinc (i.e., extension of Tobar's GP-Sinc to the case of mulltiple symmetrical rectangular blocks)
 class MultipleSpectralBlock(AnisotropicSpectralStationary):
     """
-    #TODO -- update documentation
-    The primitive kernel defined by a constant spectral density spanning a finite bandwidth.
+    
+    The primitive kernel defined by multiple constant spectral density spanning finite bandwidths.
+    To be used for Inducing Frequency Bands models.
+    Works with multi-dimensional data by taking a product over symmetrical rectangles for each input dimension.
+
     """
 
     def __init__(
@@ -144,7 +139,6 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
         **kwargs: Any
     ):
         """
-        #TODO -- write the expected shapes here
         :param powers: The variance associated with the block. Expected shape [M, ]
         (Corresponds to the power of the spectral block)
         
@@ -188,7 +182,7 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
     #    "return: [batch..., N, batch2..., N2, D] if X2 is not None",
     #    "return: [batch..., N, N, D] if X2 is None",
     #)
-    #NOTE -- we are overriding the default method from AnisotropicSpectralStationary just for the Inducing Frequency Bands project
+    #NOTE -- we are overriding the default method from AnisotropicSpectralStationary just for the Inducing Frequency Bands project or GP-MultiSinc
     def scaled_difference_matrix(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:
         """
         #TODO -- update the documentation here
@@ -207,33 +201,39 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
 
     def K_d(self, d):
         """
-        #TODO -- update the documentation here
+
         :param d: expected_shape [M, N1, N2, D]
+       
+        Implements anisotropic version of MultiSink kernel (i.e., multi-block variant of Tobar's SincGP paper).
+
+        Computes the multi-block variant of this:
+            SK(d) = σ2 sinc(∆t) cos(2πξd)
+            where:
+             σ2 - magnitude
+             ∆ - bandwidth
+             ξ - frequency
+        Remainder: because of scale function, in our implementation d is already multipled by frequency/means             
 
         returns: expected_shape [N1,N2]
         """
 
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) #[M, N1, N2]
     
-
         pre_multiplier = tf.transpose(self.bandwidths / self.means) # [M, D]
         
-
         sinc_term = tf.reduce_prod(
             sinc(tf.multiply( d, #[M, N1, N2, D]
             pre_multiplier[:, None, None, :] # [M, 1, 1, D]
         ))
         , axis = -1 ) # [M, N1, N2]
 
-
         output = self.powers[:,None, None] * cos_term * sinc_term
     
-
         return tf.reduce_sum(output, axis = 0)
 
 
 
-#TODO -- this function is temporarily used for Inducing Frequency Bands or GP-MultiSinc
+#NOTE -- deprecated way of constructing multi-spectral blocks kernels. This will be slow due to for loop.
 def SummedSpectralBlock(powers, means, bandwidths, SpectralComponent='Block'):
     """
     amplitude_sqrt shape should be (M) 
