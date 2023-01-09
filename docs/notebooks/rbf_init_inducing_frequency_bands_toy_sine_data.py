@@ -119,35 +119,17 @@ rng = np.random.RandomState(123)
 tf.random.set_seed(42)
 
 
-
-
-
-def spectral_basis_init(x, mean, bandwidth, variance, use_blocks=True):
-    if use_blocks:
-        spectrum = np.where(abs(x - mean) <= 0.5 * bandwidth, 1., 0.)
-    else:
-        spectrum = norm.pdf(x, mean, bandwidth)
-    return variance * spectrum
-
-
-
 def spectral_basis(x, mean, bandwidth, variance, use_blocks=True):
     if use_blocks:
-        spectrum = np.where(abs(x - mean) <= 0.5 * bandwidth, 1./bandwidth, 0.)
+        spectrum = np.where(abs(x - mean) <= 0.5 * bandwidth, 1./ (2. * bandwidth), 0.)
     else:
         spectrum = norm.pdf(x, mean, bandwidth)
     return variance * spectrum
 
 
-def make_component_spectrum(x, mean, bandwidth, variance, use_blocks=True, init = False):
+def make_component_spectrum(x, mean, bandwidth, variance, use_blocks=True):
     
-    if init:
-
-        spectrum = 1. * (spectral_basis_init(x, mean, bandwidth, variance, use_blocks) + spectral_basis_init(x, -mean, bandwidth, variance, use_blocks))
-
-    else:
-
-        spectrum = 1. * (spectral_basis(x, mean, bandwidth, variance, use_blocks) + spectral_basis(x, -mean, bandwidth, variance, use_blocks))
+    spectrum = 1. * (spectral_basis(x, mean, bandwidth, variance, use_blocks) + spectral_basis(x, -mean, bandwidth, variance, use_blocks))
     
     return spectrum
 
@@ -244,26 +226,20 @@ print(bandwidths_np.shape)
 #powers_np = np.ones(N_COMPONENTS, )
 
 
-
-
 powers_np = [np.float64(np_float)  for np_float in powers_np]
 print('powers_np')
 print(powers_np)
 
 
-#kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
-#    bandwidths= bandwidths_np, powers=powers_np)
 #kern = gpflow.kernels.SummedSpectralBlock(powers = powers_np, means = means_np, bandwidths = bandwidths_np, SpectralComponent='Block')
 kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
     bandwidths= bandwidths_np, powers=powers_np)
 
-
 fig, ax = plt.subplots(1,1, figsize=(5, 2.5))
 
 for _ in range(N_COMPONENTS):
-    spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), means_np[:,_], bandwidths_np[:,_], powers_np[_], use_blocks = True, init = True)
+    spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), means_np[:,_], bandwidths_np[:,_], powers_np[_], use_blocks = True)
     ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), label='$S_{aa}(\\nu)$', linewidth=.8)
-
 
 spectral_block_1a = rbf_spectral_density(np.linspace(0, MAXFREQ, 1000) 
     )
@@ -274,33 +250,44 @@ plt.close()
 
 ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
 
-#Z = X[:M, :].copy() # Initialise inducing locations to the first M inputs in the dataset
-m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
-
-#m = gpflow.models.GPR( data = (X, Y), kernel = kern)
+print('-------- Inducing Variables --------')
+print(ind_var)
 
 
-#opt = gpflow.optimizers.Scipy()
-#opt_logs = opt.minimize(
-#    m.training_loss, m.trainable_variables, options=dict(maxiter=MAXITER)
-#
-# 
-# 
-# )
+#m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
+m = gpflow.models.SGPR((X, Y), kern, ind_var)
 
 print('--------------------------')
+print('trainable variables at the beginning')
 print(m.trainable_variables)
 gpflow.utilities.set_trainable(m.kernel.bandwidths, False)
 gpflow.utilities.set_trainable(m.kernel.means, False)
-gpflow.utilities.set_trainable(m.kernel.powers, False)
+#gpflow.utilities.set_trainable(m.kernel.powers, False)
 print('--------------------------')
+print('trainable variables after deactivation')
 print(m.trainable_variables)
 
 opt = gpflow.optimizers.Scipy()
 #opt = tf.optimizers.Adam()
-opt.minimize(m.training_loss_closure((X, Y)), m.trainable_variables)
+
+opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=100))
 
 
+print('---- After training -----')
+print('means_np')
+print(tf.convert_to_tensor(kern.means).numpy())
+
+
+print('bandwidths_np')
+print(tf.convert_to_tensor(kern.bandwidths).numpy())
+
+#means_np = np.ones((1,N_COMPONENTS)) 
+#bandwidths_np = np.ones((1,N_COMPONENTS)) 
+#powers_np = np.ones(N_COMPONENTS, )
+
+#powers_np = [np.float64(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
+print('powers_np')
+print(tf.convert_to_tensor(kern.powers).numpy())
 
 # %% [markdown]
 # Finally, we plot the model's predictions.
@@ -327,9 +314,7 @@ def plot(title=""):
 
     plt.legend(loc="lower right")
 
-
 plot("Predictions after training")
-
 
 
 def plot_samples(title=""):
@@ -367,14 +352,10 @@ plt.savefig('./figures/sample_svgp_freq_bands_toy_data.png')
 plt.close()
 
 
-
-
 # Periodogram and optimized symmetrical rectangles
-
 
 MAXFREQ=15.
 ax = data_object.plot_spectrum(maxfreq=MAXFREQ)
-
 
 for _ in range(N_COMPONENTS):
 
@@ -385,6 +366,12 @@ for _ in range(N_COMPONENTS):
         tf.convert_to_tensor(kern.kernels[_].powers).numpy(), 
         use_blocks = True)
     """
+
+for _ in range(N_COMPONENTS):
+    spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), means_np[:,_], bandwidths_np[:,_], powers_np[_], use_blocks = True)
+    ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), label='$S_{aa}(\\nu)$', linewidth=.8)
+
+
     spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
         tf.convert_to_tensor(kern.means[:,_]).numpy(), 
         tf.convert_to_tensor(kern.bandwidths[:,_]).numpy(), 
@@ -392,6 +379,9 @@ for _ in range(N_COMPONENTS):
         use_blocks = True)
 
     ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SB_'+str(_), linewidth=.8)
+EXPERIMENT_NAME = 'periodogram_init_svgp_freq_bands'
 
 plt.savefig('./figures/svgp_freq_bands_toy_data_periodogram.png')
 plt.close()
+
+
