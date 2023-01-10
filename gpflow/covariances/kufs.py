@@ -20,6 +20,15 @@ from ..base import TensorLike, TensorType
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
 from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel
 from .dispatch import Kuf
+import math
+
+def rbf_spectral_density(freq, lengthscale, variance):
+
+    constant_num = tf.sqrt(tf.sqrt(lengthscale)) / (2. * tf.sqrt(math.pi))
+    freq_term = tf.exp(- tf.sqrt(lengthscale) * freq**2 * 0.25)
+    S =   constant_num * freq_term
+
+    return S * variance
 
 
 @Kuf.register(InducingPoints, Kernel, TensorLike)
@@ -44,6 +53,43 @@ def Kuf_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, Xnew: TensorType
 ) -> tf.Tensor:
     return kernel(inducing_variable.Z, Xnew)
+
+
+
+# NOTE -- this completly breaks fthe dispatcher method in GPflow
+@Kuf.register(SpectralInducingVariables, IFFMultipleSpectralBlock, TensorLike)
+#@check_shapes(
+#    "inducing_variable: [M, D, 1]",
+#    "Xnew: [batch..., N, D]",
+#    "return: [M, batch..., N]",
+#)
+def Kuf_IFF_block_spectral_kernel_inducingpoints(
+    inducing_variable: SpectralInducingVariables, kernel: IFFMultipleSpectralBlock, Xnew: TensorType
+) -> tf.Tensor:
+
+    _means = kernel.means # expected shape [D, M]
+    _lengthscales = kernel.lengthscales # expected shape TODO -- add it
+    _variance = kernel.variance # expected shape TODO -- add it
+    print('--- inside spectral Kuf dfispatcher ------')
+
+    print(sine_term)
+    
+    cosine_term = 2.0 * tf.reduce_prod( tf.cos( 2.0 * math.pi * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+        tf.transpose(Xnew)[None, ...] # [1, D, N]
+    ) #[M, D, N]
+    ), axis = 1) #[M, N]
+    print('cosine term') 
+    print(cosine_term)
+    
+    pre_multiplier = tf.sqrt( rbf_spectral_density(freq = _means, 
+        lengthscale = _lengthscales, variance = _variance)) # expected shape (M, )
+    print('pre_multiplier')
+    print(pre_multiplier[..., None])
+
+    print('output')
+    print(pre_multiplier[..., None] *  cosine_term)
+
+    return pre_multiplier[..., None] * cosine_term # expected shape (M, N)
 
 
 # NOTE -- this completly breaks fthe dispatcher method in GPflow

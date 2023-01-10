@@ -17,7 +17,7 @@ from check_shapes import check_shapes
 
 from ..config import default_float
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel 
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, IFFMultipleSpectralBlock 
 from .dispatch import Kuu
 
 
@@ -56,6 +56,20 @@ def Kuu_block_spectral_kernel_inducingpoints(
     print(Kzz)
 
     return Kzz
+
+#NOTE -- this completly breaks the dispatcher framework present in GPflow
+@Kuu.register(SpectralInducingVariables, IFFMultipleSpectralBlock)
+def Kuu_IFF_block_spectral_kernel_inducingpoints(
+    inducing_variable: SpectralInducingVariables, kernel: IFFMultipleSpectralBlock, *, jitter: float = 0.0
+) -> tf.Tensor:
+    
+    Kzz = tf.linalg.diag(tf.math.reciprocal(kernel.bandwidths))
+    Kzz = tf.cast(Kzz, default_float())
+    print('Kzz -- inside Kuu dispatcher')
+    print(Kzz)
+
+    return Kzz
+
 
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(

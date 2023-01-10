@@ -51,7 +51,9 @@ from .spectral import (
     SpectralBlock, 
     MixtureSpectralGaussian,
     SummedSpectralBlock, 
-    SpectralDiracDeltaBlock
+    SpectralDiracDeltaBlock,
+    IFFSpectralStationary,
+    IFFMultipleSpectralBlock
 )
 
 from .spectral_stationaries import (

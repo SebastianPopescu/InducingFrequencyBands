@@ -120,6 +120,57 @@ class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
         return output
 
 
+
+
+#NOTE -- this is to be only used for the Integrated Fourier Features model 
+class IFFMultipleSpectralBlock(IsotropicSpectralStationary):
+    """
+    
+    The primitive kernel defined by multiple constant spectral density spanning finite bandwidths.
+    To be used for Integrated Fourier Features models.
+    Works with multi-dimensional data by taking a product over symmetrical rectangles for each input dimension.
+
+    Important: this translates just to a squared exponential kernel to be used for Kff
+    Kuu and Kuf for this type of model will be tailored in the covariances dispatcher
+
+    """
+
+    def __init__(
+        self,
+        n_components: int,
+        powers,
+        means,
+        bandwidths,
+        lengthscales,
+        variance,
+        **kwargs: Any
+    ):
+        """
+        :param powers: The variance associated with the block. Expected shape [M, ]
+        (Corresponds to the power of the spectral block)
+        
+        :param means: Defined as the inverse of the mean frequency. Expected shape [D, M]
+        (Corresponds to the frequency location of the spectral block)
+        
+        :param bandwidths: The frequency range spanned by the spectral block. Expected shape [D, M]
+        (Corresponds to the delta) notation
+        
+        :param lengthscales: TODO missing param description
+
+        :param variance: TODO missing param description
+
+        :param active_dims: TODO missing param description
+        """
+
+        super().__init__(powers = powers, means = means, bandwidths = bandwidths, **kwargs)
+
+        self.n_components = n_components
+
+    @inherit_check_shapes
+    def K_r2(self, r2: TensorType) -> tf.Tensor:
+        return self.variance * tf.exp(-0.5 * r2)
+
+
 #NOTE -- this is to be only used for the InducingFrequencyBands model or GP-MultiSinc (i.e., extension of Tobar's GP-Sinc to the case of mulltiple symmetrical rectangular blocks)
 class MultipleSpectralBlock(AnisotropicSpectralStationary):
     """
@@ -174,7 +225,6 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
 
         return X_scaled
 
-
     #TODO -- reintroduce these at a latter point
     #@check_shapes(
     #    "X: [batch..., N, D]",
@@ -197,7 +247,6 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
             ) # expected shape [M, N, N2, D]
 
         return diff_matrix
-
 
     def K_d(self, d):
         """

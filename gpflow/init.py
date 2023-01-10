@@ -82,7 +82,6 @@ def riemann_approximate_rbf_initial_components(
     return means, bandwidths, powers
 
 
-
 def get_lomb_scargle_value(X, Y, freq, maxfreq = None, transformed = False):
 
     n=10000
