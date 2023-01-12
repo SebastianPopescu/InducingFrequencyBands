@@ -14,10 +14,9 @@ from gpflow.kernels.base import Sum
 from gpflow.kernels.spectral_utils import sinc
 from gpflow.base import Parameter, TensorType
 from .spectral_utils import sinc
-
 from ..utilities.ops import difference_matrix, square_distance, batched_difference_matrix
-
-
+from check_shapes import check_shapes, inherit_check_shapes
+from ..utilities import positive
 #NOTE -- this is basically the Sinc kernel
 class SpectralBlock(AnisotropicSpectralStationary):
     """
@@ -163,6 +162,10 @@ class IFFMultipleSpectralBlock(IsotropicSpectralStationary):
         """
 
         super().__init__(powers = powers, means = means, bandwidths = bandwidths, **kwargs)
+
+        self.variance = Parameter(variance, transform=positive())
+        self.lengthscales = Parameter(lengthscales, transform=positive())
+        self._validate_ard_active_dims(self.lengthscales)
 
         self.n_components = n_components
 

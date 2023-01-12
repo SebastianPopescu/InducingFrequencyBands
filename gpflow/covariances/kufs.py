@@ -18,13 +18,16 @@ from check_shapes import check_shapes
 
 from ..base import TensorLike, TensorType
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, IFFMultipleSpectralBlock
 from .dispatch import Kuf
 import math
 
 def rbf_spectral_density(freq, lengthscale, variance):
 
-    constant_num = tf.sqrt(tf.sqrt(lengthscale)) / (2. * tf.sqrt(math.pi))
+    _pi = math.pi
+    _pi = tf.cast(_pi, tf.float64)
+
+    constant_num = tf.sqrt(tf.sqrt(lengthscale)) / (2. * tf.sqrt(_pi))
     freq_term = tf.exp(- tf.sqrt(lengthscale) * freq**2 * 0.25)
     S =   constant_num * freq_term
 
@@ -71,9 +74,7 @@ def Kuf_IFF_block_spectral_kernel_inducingpoints(
     _lengthscales = kernel.lengthscales # expected shape TODO -- add it
     _variance = kernel.variance # expected shape TODO -- add it
     print('--- inside spectral Kuf dfispatcher ------')
-
-    print(sine_term)
-    
+ 
     cosine_term = 2.0 * tf.reduce_prod( tf.cos( 2.0 * math.pi * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
@@ -81,8 +82,9 @@ def Kuf_IFF_block_spectral_kernel_inducingpoints(
     print('cosine term') 
     print(cosine_term)
     
-    pre_multiplier = tf.sqrt( rbf_spectral_density(freq = _means, 
-        lengthscale = _lengthscales, variance = _variance)) # expected shape (M, )
+    #TODO -- this squeeze is a hack, fix underlying issue
+    pre_multiplier = tf.squeeze(tf.sqrt( rbf_spectral_density(freq = _means, 
+        lengthscale = _lengthscales, variance = _variance)), axis = 0) # expected shape (M, )
     print('pre_multiplier')
     print(pre_multiplier[..., None])
 

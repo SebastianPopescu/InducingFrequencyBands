@@ -68,7 +68,8 @@ def Kuu_IFF_block_spectral_kernel_inducingpoints(
     print('Kzz -- inside Kuu dispatcher')
     print(Kzz)
 
-    return Kzz
+    #TODO -- squeeze is a temp hack, fix underlying issue
+    return tf.squeeze(Kzz, axis = 0)
 
 
 @Kuu.register(Multiscale, SquaredExponential)
