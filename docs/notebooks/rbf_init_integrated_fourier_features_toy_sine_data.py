@@ -33,6 +33,7 @@ from gpflow.ci_utils import reduce_in_tests
 
 import tikzplotlib
 from scipy.stats import norm
+import os
 
 import matplotlib.pyplot as plt
 plt.ion()
@@ -60,6 +61,8 @@ def func(x):
         + 0.5 * np.sin(x * 7 * 3.14)
     )
 
+cmd = 'mkdir -p ./figures'
+os.system(cmd)
 
 N = 10000  # Number of training observations
 
@@ -233,7 +236,7 @@ print(powers_np)
 #TODO -- need to add lengthscales and variance as well
 #kern = gpflow.kernels.SummedSpectralBlock(powers = powers_np, means = means_np, bandwidths = bandwidths_np, SpectralComponent='Block')
 kern = gpflow.kernels.IFFMultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
-    bandwidths= bandwidths_np, powers=powers_np)
+    bandwidths= bandwidths_np, powers=powers_np, lengthscales = 0.301, variance = 0.301)
 
 fig, ax = plt.subplots(1,1, figsize=(5, 2.5))
 
