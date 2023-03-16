@@ -33,7 +33,8 @@ class SpectralInducingVariables(Module, abc.ABC):
     @abc.abstractmethod
     def num_inducing(self) -> tf.Tensor:
         """
-        Returns the number of inducing variables, relevant for example to determine the size of the
+        Returns the number of inducing variables or in this case frequency bands, 
+        the number of , relevant for example to determine the size of the
         variational distribution.
         """
         raise NotImplementedError
@@ -60,12 +61,15 @@ class SpectralInducingVariables(Module, abc.ABC):
         """
 
 class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
+    """
+    We actually hold all the information pertaining to inducing frequency bands in the underlying kernel.
+    """
     def __init__(self, 
         kern: MultipleSpectralBlock,
         name: Optional[str] = None
         ):
         """
-        :param kern: contains all the information needed to parametrize 
+        :param kern: contains all the information needed to parametrize the inducing frequency bands 
         :param means: #TODO -- document param and expected shape as well
         :param bandwidths: #TODO -- document param and expected shape as well
         :param variances:#TODO -- focument param and expected shape as well

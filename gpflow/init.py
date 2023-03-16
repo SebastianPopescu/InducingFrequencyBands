@@ -167,7 +167,7 @@ def riemann_approximate_periodogram_initial_components(
     return means, bandwidths, powers
 
 
-def rbf_spectral_density(freq, lengthscale = 0.301, variance=1.):
+def rbf_spectral_density(freq, lengthscale = 0.301, variance=0.301):
 
     constant_num = np.sqrt(np.sqrt(lengthscale)) / (2. * np.sqrt(np.pi))
     freq_term = np.exp(- np.sqrt(lengthscale) * freq**2 * 0.25)
@@ -183,7 +183,6 @@ def matern_1_2_spectral_density(freq, lengthscale, variance=1.):
     return S * variance
 
 
-
 def matern_3_2_spectral_density(freq, lengthscale, variance=1.):
 
     const_num = 1. + (np.sqrt(3.) * freq) / np.sqrt(lengthscale)
@@ -191,7 +190,6 @@ def matern_3_2_spectral_density(freq, lengthscale, variance=1.):
     S = const_num * freq_term
     
     return S * variance
-
 
 
 def matern_5_2_spectral_density(freq, lengthscale, variance=1.):
@@ -203,10 +201,7 @@ def matern_5_2_spectral_density(freq, lengthscale, variance=1.):
     return S * variance
 
 
-
-
-
-#TODO -- eventually introduce this into the codebase
+#TODO -- eventually introduce this into the codebase, as it would initialize the spectral density of the kernel to almost match the real one (at least as estiamted by BNSE)
 #def BNSE(x, y, y_err=None, max_freq=None, n=1000, iters=100):
 """
     Bayesian non-parametric spectral estimation [1] is a method for estimating the power spectral density of a signal that uses a Gaussian process with a spectral mixture kernel to learn the spectral representation of the signal. The resulting power spectral density is distributed as a generalized Chi-Squared distributions.

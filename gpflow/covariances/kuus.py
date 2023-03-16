@@ -33,7 +33,7 @@ def Kuu_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-
+#TODO -- why does this have the same name?
 @Kuu.register(SpectralInducingVariables, SpectralKernel)
 def Kuu_block_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, *, jitter: float = 0.0
@@ -43,7 +43,7 @@ def Kuu_block_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-
+#TODO -- why does this have the same name?
 #NOTE -- this completly breaks the dispatcher framework present in GPflow
 @Kuu.register(SpectralInducingVariables, MultipleSpectralBlock)
 def Kuu_block_spectral_kernel_inducingpoints(

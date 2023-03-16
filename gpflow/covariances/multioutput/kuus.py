@@ -48,7 +48,7 @@ def Kuu_generic(
     jittermat = jitter * tf.reshape(tf.eye(M, dtype=Kmm.dtype), tf.shape(Kmm))
     return Kmm + jittermat
 
-
+#TODO -- does this actually work for IFF?
 @Kuu.register(InducingPoints, MultioutputKernel)
 @check_shapes(
     "inducing_variable: [M, D, 1]",

@@ -18,6 +18,7 @@ import tensorflow as tf
 from check_shapes import Shape, check_shapes
 from .inducing_variables import MultioutputInducingVariables, FallbackSharedIndependentInducingVariables, FallbackSeparateIndependentInducingVariables
 
+#TODO -- need to actually populate these classes once I get the baseline method to work
 
 class MultioutputSpectralInducingVariables(MultioutputInducingVariables):
     
@@ -25,15 +26,11 @@ class MultioutputSpectralInducingVariables(MultioutputInducingVariables):
     just a subclass for the time being
     """
 
-
-
 class FallbackSharedIndependentSpectralInducingVariables(FallbackSharedIndependentInducingVariables):
 
     """
     just a subclass for the time being
     """
-
-
 
 class FallbackSeparateIndependentSpectralInducingVariables(FallbackSeparateIndependentInducingVariables):
 
@@ -41,13 +38,11 @@ class FallbackSeparateIndependentSpectralInducingVariables(FallbackSeparateIndep
     just a subclass for the time being
     """
 
-
 class SharedIndependentSpectralInducingVariables(FallbackSharedIndependentSpectralInducingVariables):
 
     """
     just a subclass for the time being
     """
-
 
 class SeparateIndependentSpectralInducingVariables(FallbackSeparateIndependentSpectralInducingVariables):
 

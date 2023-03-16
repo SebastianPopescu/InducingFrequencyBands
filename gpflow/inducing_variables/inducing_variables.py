@@ -93,7 +93,7 @@ class InducingPoints(InducingPointsBase):
     Real-space inducing points
     """
 
-
+#TODO -- do we still need this?
 class SpectralInducingPoints(InducingPointsBase):
     """
     Real-space inducing points to be used for Spectral kernels

@@ -59,7 +59,7 @@ def Kuf_kernel_inducingpoints(
 
 
 
-# NOTE -- this completly breaks fthe dispatcher method in GPflow
+# NOTE -- this completly breaks the dispatcher method in GPflow
 @Kuf.register(SpectralInducingVariables, IFFMultipleSpectralBlock, TensorLike)
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",
@@ -94,7 +94,7 @@ def Kuf_IFF_block_spectral_kernel_inducingpoints(
     return pre_multiplier[..., None] * cosine_term # expected shape (M, N)
 
 
-# NOTE -- this completly breaks fthe dispatcher method in GPflow
+# NOTE -- this completly breaks the dispatcher method in GPflow
 @Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",

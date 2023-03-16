@@ -17,7 +17,8 @@ from .spectral_utils import sinc
 from ..utilities.ops import difference_matrix, square_distance, batched_difference_matrix
 from check_shapes import check_shapes, inherit_check_shapes
 from ..utilities import positive
-#NOTE -- this is basically the Sinc kernel
+
+#NOTE -- this is basically the Sinc kernel from Tobar's paper
 class SpectralBlock(AnisotropicSpectralStationary):
     """
     The primitive kernel defined by a constant spectral density spanning a finite bandwidth.
@@ -45,7 +46,7 @@ class SpectralBlock(AnisotropicSpectralStationary):
     def K_d(self, d):
         """
         
-        Implements anisotropic version of Sink kernel.
+        Implements anisotropic version of Sinc kernel.
 
         Computes:
             SK(d) = σ2 sinc(∆t) cos(2πξd)
@@ -84,7 +85,7 @@ class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
     """
 
     The primitive kernel defined by a constant spectral density spanning an infinitesimally small bandwidth (Dirac delta).
-
+    Boils down to a cosine kernel, effectively.
     """
 
     def __init__(
@@ -107,7 +108,7 @@ class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
         #TODO -- update the documentation here
         :param d: expected_shape [N1, N2, D]
 
-        returns: expected_shape [N1,N2]
+        returns: expected_shape [N1, N2]
         """
 
         print('----- inside K_d of  SpectralDiracDeltaBlock ------')
@@ -130,7 +131,7 @@ class IFFMultipleSpectralBlock(IsotropicSpectralStationary):
     Works with multi-dimensional data by taking a product over symmetrical rectangles for each input dimension.
 
     Important: this translates just to a squared exponential kernel to be used for Kff
-    Kuu and Kuf for this type of model will be tailored in the covariances dispatcher
+    Kuu and Kuf for this type of model will be tailor made in the covariances dispatcher. 
 
     """
 
@@ -147,7 +148,7 @@ class IFFMultipleSpectralBlock(IsotropicSpectralStationary):
         """
         :param powers: The variance associated with the block. Expected shape [M, ]
         (Corresponds to the power of the spectral block)
-        
+        #NOTE -- is it reallt defined as the inverse of the mean frequency?
         :param means: Defined as the inverse of the mean frequency. Expected shape [D, M]
         (Corresponds to the frequency location of the spectral block)
         
@@ -169,6 +170,7 @@ class IFFMultipleSpectralBlock(IsotropicSpectralStationary):
 
         self.n_components = n_components
 
+    #TODO -- I am not sure this actually gets used since we use custom made formulas in the dispatcher for the Kuu and Kuf
     @inherit_check_shapes
     def K_r2(self, r2: TensorType) -> tf.Tensor:
         return self.variance * tf.exp(-0.5 * r2)

@@ -9,7 +9,7 @@ from gpflow.config import default_float
 
 TINY = 1e-20
 
-
+#NOTE -- I think this is copied from Fergus
 def sinc(x, apply_normalisation=True):
     """
     Evaluate the sinc function, with special treatment required at very small values of x.

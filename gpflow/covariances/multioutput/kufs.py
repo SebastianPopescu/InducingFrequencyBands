@@ -33,6 +33,8 @@ from ...kernels import (
 )
 from ..dispatch import Kuf
 
+#TODO -- this is actually missing a spectral method
+
 
 @Kuf.register(InducingPoints, MultioutputKernel, object)
 @check_shapes(
