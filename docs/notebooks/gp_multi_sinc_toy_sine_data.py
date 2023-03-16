@@ -45,6 +45,8 @@ plt.style.use("ggplot")
 rng = np.random.RandomState(123)
 tf.random.set_seed(42)
 
+
+
 # %% [markdown]
 # ## Generating data
 # For this notebook example, we generate 10,000 noisy observations from a test function:
@@ -207,7 +209,6 @@ MAXFREQ=10.
 N_COMPONENTS = 10
 MAXITER = 100
 
-
 means_np, bandwidths_np, powers_np = np_disjoint_initial_components([10.], n_components=N_COMPONENTS, x_interval = [X.max() -  X.min()])
 
 means_np = means_np.astype(np.float64)
@@ -244,13 +245,8 @@ for _ in range(N_COMPONENTS):
 plt.savefig('./figures/gp_multi_sinc_sym_rec_init.png')
 plt.close()
 
-#ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
-
-#Z = X[:M, :].copy() # Initialise inducing locations to the first M inputs in the dataset
-#m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
 
 m = gpflow.models.GPR( data = (X, Y), kernel = kern)
-
 
 opt = gpflow.optimizers.Scipy()
 opt_logs = opt.minimize(
@@ -298,6 +294,7 @@ ax = data_object.plot_spectrum(maxfreq=MAXFREQ)
 
 for _ in range(N_COMPONENTS):
 
+    #TODO -- why do we still need this?
     """
     spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
         tf.convert_to_tensor(kern.kernels[_].means).numpy(), 

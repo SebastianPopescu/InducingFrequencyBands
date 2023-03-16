@@ -265,7 +265,7 @@ print('trainable variables at the beginning')
 print(m.trainable_variables)
 gpflow.utilities.set_trainable(m.kernel.bandwidths, False)
 gpflow.utilities.set_trainable(m.kernel.means, False)
-#gpflow.utilities.set_trainable(m.kernel.powers, False)
+gpflow.utilities.set_trainable(m.kernel.powers, True)
 print('--------------------------')
 print('trainable variables after deactivation')
 print(m.trainable_variables)
@@ -318,7 +318,8 @@ def plot(title=""):
     plt.legend(loc="lower right")
 
 plot("Predictions after training")
-
+plt.savefig('./figures/moments_sgpr_iff_toy_data.png')
+plt.close()
 
 def plot_samples(title=""):
     plt.figure(figsize=(12, 4))
@@ -332,26 +333,14 @@ def plot_samples(title=""):
     # predict_f_samples draws n_samples examples of the function f, and returns their values at Xplot.
     fs = m.predict_f_samples(pX, n_samples)
     plt.plot(pX, fs[:, :, 0].numpy().T)
-    #ax.set_ylim(bottom=-2.0, top=2.0)
-    #ax.set_title("Example $f$s")
 
     plt.plot(X, Y, "x", label="Training points", alpha=0.2)
     (line,) = plt.plot(pX, pY, lw=1.5, label="Mean of predictive posterior")
-    #col = line.get_color()
-    #plt.fill_between(
-    #    pX[:, 0],
-    #    (pY - 2 * pYv ** 0.5)[:, 0],
-    #    (pY + 2 * pYv ** 0.5)[:, 0],
-    #    color=col,
-    #    alpha=0.6,
-    #    lw=1.5,
-    #)
-    #Z = m.inducing_variable.Z.numpy()
-    #plt.plot(Z, np.zeros_like(Z), "k|", mew=2, label="Inducing locations")
+
     plt.legend(loc="lower right")
 
 plot_samples("Sample Predictions after training")
-plt.savefig('./figures/sample_svgp_freq_bands_toy_data.png')
+plt.savefig('./figures/samples_sgpr_iff_toy_data.png')
 plt.close()
 
 
@@ -362,6 +351,7 @@ ax = data_object.plot_spectrum(maxfreq=MAXFREQ)
 
 for _ in range(N_COMPONENTS):
 
+    #NOTE -- do we still need this?
     """
     spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
         tf.convert_to_tensor(kern.kernels[_].means).numpy(), 
@@ -384,7 +374,7 @@ for _ in range(N_COMPONENTS):
     ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SB_'+str(_), linewidth=.8)
 EXPERIMENT_NAME = 'periodogram_init_svgp_freq_bands'
 
-plt.savefig('./figures/svgp_freq_bands_toy_data_periodogram.png')
+plt.savefig('./figures/sgpr_iff_toy_data_periodogram.png')
 plt.close()
 
 
