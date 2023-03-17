@@ -210,7 +210,6 @@ MAXFREQ=10.
 N_COMPONENTS = 50
 MAXITER = 5000
 
-
 means_np, bandwidths_np, powers_np = riemann_approximate_rbf_initial_components([MAXFREQ], n_components=N_COMPONENTS, x_interval = [X.max() -  X.min()])
 
 means_np = means_np.astype(np.float64)
@@ -248,7 +247,7 @@ spectral_block_1a = rbf_spectral_density(np.linspace(0, MAXFREQ, 1000)
     )
 ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), label='RBF spectral density', linewidth=.8)
 
-plt.savefig('./figures/svgp_freq_bands_sym_rec_init.png')
+plt.savefig('./figures/sgpr_iff_sym_rec_init.png')
 plt.close()
 
 ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
@@ -256,8 +255,6 @@ ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = ker
 print('-------- Inducing Variables --------')
 print(ind_var)
 
-
-#m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
 m = gpflow.models.SGPR((X, Y), kern, ind_var)
 
 print('--------------------------')
@@ -265,7 +262,7 @@ print('trainable variables at the beginning')
 print(m.trainable_variables)
 gpflow.utilities.set_trainable(m.kernel.bandwidths, False)
 gpflow.utilities.set_trainable(m.kernel.means, False)
-gpflow.utilities.set_trainable(m.kernel.powers, True)
+gpflow.utilities.set_trainable(m.kernel.powers, False)
 print('--------------------------')
 print('trainable variables after deactivation')
 print(m.trainable_variables)
@@ -273,14 +270,11 @@ print(m.trainable_variables)
 opt = gpflow.optimizers.Scipy()
 #opt = tf.optimizers.Adam()
 
-opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=100))
-
+opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=10))
 
 print('---- After training -----')
 print('means_np')
 print(tf.convert_to_tensor(kern.means).numpy())
-
-
 print('bandwidths_np')
 print(tf.convert_to_tensor(kern.bandwidths).numpy())
 
@@ -372,7 +366,7 @@ for _ in range(N_COMPONENTS):
         use_blocks = True)
 
     ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SB_'+str(_), linewidth=.8)
-EXPERIMENT_NAME = 'periodogram_init_svgp_freq_bands'
+EXPERIMENT_NAME = None
 
 plt.savefig('./figures/sgpr_iff_toy_data_periodogram.png')
 plt.close()
