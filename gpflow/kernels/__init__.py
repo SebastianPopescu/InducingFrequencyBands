@@ -47,10 +47,6 @@ from .stationaries import (  # isort:skip
 )
 
 from .spectral import (
-    MultipleSpectralBlock, 
-    SpectralBlock, 
-    MixtureSpectralGaussian,
-    SummedSpectralBlock, 
     SpectralDiracDeltaBlock,
     IFFMultipleSpectralBlock
 )

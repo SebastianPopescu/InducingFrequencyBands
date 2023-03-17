@@ -22,7 +22,7 @@ from .base import TensorType
 from .config import default_float, default_jitter
 from .covariances import Kuu
 from .inducing_variables import InducingVariables, RectangularSpectralInducingPoints
-from .kernels import Kernel, MultipleSpectralBlock
+from .kernels import Kernel, IFFMultipleSpectralBlock
 from .utilities import Dispatcher, to_default_float
 
 prior_kl = Dispatcher("prior_kl")
@@ -51,7 +51,7 @@ def _(
 
 
 
-@prior_kl.register(RectangularSpectralInducingPoints, MultipleSpectralBlock, object, object)
+@prior_kl.register(RectangularSpectralInducingPoints, IFFMultipleSpectralBlock, object, object)
 @check_shapes(
     "inducing_variable: [N, D, broadcast L]",
     "q_mu: [M, L]",
@@ -60,7 +60,7 @@ def _(
 )
 def _(
     inducing_variable: RectangularSpectralInducingPoints,
-    kernel: MultipleSpectralBlock,
+    kernel: IFFMultipleSpectralBlock,
     q_mu: TensorType,
     q_sqrt: TensorType,
     whiten: bool = False,

@@ -318,94 +318,8 @@ class SpectralProduct(ReducingSpectralCombination):
     def _reduce(self) -> Callable[[Sequence[TensorType]], TensorType]:
         return partial(reduce, tf.multiply)
 
-class SpectralStationary(SpectralKernel):
-    """
-    Base class for spectral kernels that are stationary, that is, they only depend on
-
-        d = x - x'
-
-    This class handles 'ard' behaviour, which stands for 'Automatic Relevance
-    Determination'. This means that the kernel has one lengthscale per
-    dimension, otherwise the kernel is isotropic (has a single lengthscale).
-    """
-
-    #TODO -- reintroduce check_shapes
-    #@check_shapes(
-    #    "variance: []",
-    #    "lengthscales: [broadcast n_active_dims]",
-    #)
-    def __init__(
-        self, 
-        powers: TensorType, 
-        means: TensorType, 
-        bandwidths: TensorType,
-        **kwargs: Any
-    ) -> None:
-        """
-        :param powers: TODO
-        :param means: TODO
-        :param bandwidths: TODO 
-        :param kwargs: accepts `name` and `active_dims`, which is a list or
-            slice of indices which controls which columns of X are used (by
-            default, all columns are used).
-        """
-        for kwarg in kwargs:
-            if kwarg not in {"name", "active_dims"}:
-                raise TypeError(f"Unknown keyword argument: {kwarg}")
-
-        super().__init__(**kwargs)
-
-        self.powers = Parameter(
-            powers,
-            transform=Exp(),  # type: ignore
-            name="powers",
-        )
-
-        self.means = Parameter(
-            means,
-            transform=Exp(),  # type: ignore
-            name="means",
-        )
-
-        self.bandwidths = Parameter(
-            bandwidths,
-            transform=Exp(),  # type: ignore
-            name="bandwidths",
-        )
-        self._validate_ard_active_dims(self.means)
-
-    @property
-    def ard(self) -> bool:
-        """
-        Whether ARD behaviour is active.
-        """
-        ndims: int = self.means.shape.ndims
-        return ndims > 0
-
-    #@check_shapes(
-    #    "X: [broadcast any...]",
-    #    "return: [any...]",
-    #)
-    def scale(self, X: TensorType) -> TensorType:
-        
-        """
-
-        #NOTE -- For the general Spectral kernel case, but not for Inducing Frequency Bands, nor GP-MultiSinc
-        :param X: expected shape [N, D]
-        :param self.means: expected shape [D, ]
-        
-        :return: expected shape [N, D]
-        """
-            
-        X_scaled = X * self.means if X is not None else X
-        
-        return X_scaled
-
-    @inherit_check_shapes
-    def K_diag(self, X: TensorType) -> tf.Tensor:
-        return tf.fill(tf.shape(X)[:-1], tf.squeeze(tf.reduce_sum(self.powers)))
-
-#NOTE -- for IFF, Kff is still a squared exponential so it needs kernel variance and lengthscales, whereas for Kuf and Kuu we proceed with standard spectral approach
+#NOTE -- for IFF, Kff is still a squared exponential so it needs kernel variance and lengthscales, 
+# whereas the Kuf and Kuu are custom-designed in the covariance dispatchers 
 class IFFSpectralStationary(SpectralKernel):
     """
     Base class for spectral kernels that are stationary, that is, they only depend on
@@ -432,11 +346,11 @@ class IFFSpectralStationary(SpectralKernel):
         **kwargs: Any
     ) -> None:
         """
-        :param powers: TODO
-        :param means: TODO
-        :param bandwidths: TODO 
-        :param lengthscales: TODO 
-        :param variance: TODO 
+        :param powers: TODO add docum
+        :param means: TODO add docum
+        :param bandwidths: TODO add docum
+        :param lengthscales: TODO add docum
+        :param variance: TODO add docum
         :param kwargs: accepts `name` and `active_dims`, which is a list or
             slice of indices which controls which columns of X are used (by
             default, all columns are used).
@@ -488,6 +402,7 @@ class IFFSpectralStationary(SpectralKernel):
         return X_scaled
 
     #TODO -- need to integrate this downstream somehow
+    #NOTE  -- I don't think we actually use this on this branch, I think it only gets used in the main branch for GP-sINC
     #@check_shapes(
     #    "X: [broadcast any...]",
     #    "return: [any...]",
@@ -495,7 +410,7 @@ class IFFSpectralStationary(SpectralKernel):
     def scale_spectral(self, X: TensorType) -> TensorType:
         
         """
-        #TODO -- update documentation here
+        #TODO -- update documentation her
         #NOTE -- For the general Spectral kernel case, but not for Inducing Frequency Bands, nor GP-MultiSinc
         :param X: expected shape [N, D]
         :param self.means: expected shape [D, ]
@@ -513,7 +428,7 @@ class IFFSpectralStationary(SpectralKernel):
 
 
 
-class IsotropicSpectralStationary(SpectralStationary):
+class IsotropicSpectralStationary(IFFSpectralStationary):
     """
     Base class for isotropic stationary spectral kernels, i.e. kernels that only
     depend on
@@ -560,7 +475,7 @@ class IsotropicSpectralStationary(SpectralStationary):
         return square_distance(self.scale(X), self.scale(X2))
 
 
-class AnisotropicSpectralStationary(SpectralStationary):
+class AnisotropicSpectralStationary(IFFSpectralStationary):
     """
     Base class for anisotropic stationary spectral kernels, i.e. kernels that only
     depend on

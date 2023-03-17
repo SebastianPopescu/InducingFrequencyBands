@@ -18,7 +18,7 @@ from check_shapes import check_shapes
 
 from ..base import TensorLike, TensorType
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, IFFMultipleSpectralBlock
+from ..kernels import Convolutional, Kernel, SquaredExponential,  IFFMultipleSpectralBlock
 from .dispatch import Kuf
 import math
 
@@ -29,7 +29,7 @@ def rbf_spectral_density(freq, lengthscale, variance):
 
     constant_num = tf.sqrt(tf.sqrt(lengthscale)) / (2. * tf.sqrt(_pi))
     freq_term = tf.exp(- tf.sqrt(lengthscale) * freq**2 * 0.25)
-    S =   constant_num * freq_term
+    S = constant_num * freq_term
 
     return S * variance
 
@@ -46,20 +46,8 @@ def Kuf_kernel_inducingpoints(
     return kernel(inducing_variable.Z, Xnew)
 
 
-@Kuf.register(SpectralInducingVariables, SpectralKernel, TensorLike)
-@check_shapes(
-    "inducing_variable: [M, D, 1]",
-    "Xnew: [batch..., N, D]",
-    "return: [M, batch..., N]",
-)
-def Kuf_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, Xnew: TensorType
-) -> tf.Tensor:
-    return kernel(inducing_variable.Z, Xnew)
-
-
-
 # NOTE -- this completly breaks the dispatcher method in GPflow
+# not sure this can be fixed as the underlying kernel is a squared exponential that needs to be used for Kff
 @Kuf.register(SpectralInducingVariables, IFFMultipleSpectralBlock, TensorLike)
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",
@@ -94,46 +82,6 @@ def Kuf_IFF_block_spectral_kernel_inducingpoints(
     return pre_multiplier[..., None] * cosine_term # expected shape (M, N)
 
 
-# NOTE -- this completly breaks the dispatcher method in GPflow
-@Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
-#@check_shapes(
-#    "inducing_variable: [M, D, 1]",
-#    "Xnew: [batch..., N, D]",
-#    "return: [M, batch..., N]",
-#)
-def Kuf_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, Xnew: TensorType
-) -> tf.Tensor:
-
-    _means = kernel.means # expected shape [D, M]
-    _bandwidths = kernel.bandwidths # expected shape [D, M]
-    _powers = kernel.powers # expected shape [M, ]
-
-    print('--- inside spectral Kuf dfispatcher ------')
-
-    sine_term = tf.reduce_prod( 2.0 * tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]#TODO -- need to also write a dispatcher that can be used with the Sinc kernel
-    
-    print('sine term')
-    print(sine_term)
-    
-    cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
-    print('cosine term') 
-    print(cosine_term)
-    
-    pre_multiplier = _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
-    print('pre_multiplier')
-    print(pre_multiplier[..., None])
-
-    print('output')
-    print(pre_multiplier[..., None] * sine_term * cosine_term)
-
-    return pre_multiplier[..., None] * sine_term * cosine_term # expected shape (M, N)
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)
 @check_shapes(

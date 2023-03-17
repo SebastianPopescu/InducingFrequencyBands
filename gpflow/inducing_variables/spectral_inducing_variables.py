@@ -22,7 +22,7 @@ from deprecated import deprecated
 
 from ..base import Module, Parameter, TensorData, TensorType
 from ..utilities import positive
-from ..kernels import MultipleSpectralBlock
+
 
 class SpectralInducingVariables(Module, abc.ABC):
     """
@@ -34,7 +34,7 @@ class SpectralInducingVariables(Module, abc.ABC):
     def num_inducing(self) -> tf.Tensor:
         """
         Returns the number of inducing variables or in this case frequency bands, 
-        the number of , relevant for example to determine the size of the
+        the number of which is relevant for example to determine the size of the
         variational distribution.
         """
         raise NotImplementedError
@@ -65,7 +65,7 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
     We actually hold all the information pertaining to inducing frequency bands in the underlying kernel.
     """
     def __init__(self, 
-        kern: MultipleSpectralBlock,
+        kern,
         name: Optional[str] = None
         ):
         """
@@ -77,21 +77,6 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
 
         super().__init__(name=name)
         self.kern = kern
-
-        """
-        #TODO -- I think this might cause some problems with shape_check in posteriors.py
-        if not isinstance(means, (tf.Variable, tfp.util.TransformedVariable)):
-            means = Parameter(means, transform=positive())
-        self.means = means
-
-        if not isinstance(bandwidths, (tf.Variable, tfp.util.TransformedVariable)):
-            bandwidths = Parameter(bandwidths, transform=positive())
-        self.bandwidths = bandwidths
-
-        if not isinstance(variances, (tf.Variable, tfp.util.TransformedVariable)):
-            variances = Parameter(variances, transform=positive())
-        self.variances = variances
-        """
 
     @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
     @check_shapes(
@@ -110,5 +95,6 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
 
 class RectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
     """
-    Real-space (in output space) "spectral" inducing points with a PSD given by symmetrical rectangles. Corresponding kernel is the sinc kernel.
+    Real-space (in output space) "spectral" inducing points with a PSD given by symmetrical rectangles. 
+    Corresponding kernel for the IFF model is the squared exponential kernel.
     """

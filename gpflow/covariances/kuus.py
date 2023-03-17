@@ -17,7 +17,7 @@ from check_shapes import check_shapes
 
 from ..config import default_float
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, IFFMultipleSpectralBlock 
+from ..kernels import Convolutional, Kernel, SquaredExponential, IFFMultipleSpectralBlock 
 from .dispatch import Kuu
 
 
@@ -33,31 +33,9 @@ def Kuu_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-#TODO -- why does this have the same name?
-@Kuu.register(SpectralInducingVariables, SpectralKernel)
-def Kuu_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, *, jitter: float = 0.0
-) -> tf.Tensor:
-    
-    Kzz = kernel(inducing_variable.Z)
-    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
-    return Kzz
-
-#TODO -- why does this have the same name?
-#NOTE -- this completly breaks the dispatcher framework present in GPflow
-@Kuu.register(SpectralInducingVariables, MultipleSpectralBlock)
-def Kuu_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
-) -> tf.Tensor:
-    
-    Kzz = tf.linalg.diag(kernel.powers)
-    Kzz = tf.cast(Kzz, default_float())
-    print('Kzz -- inside Kuu dispatcher')
-    print(Kzz)
-
-    return Kzz
 
 #NOTE -- this completly breaks the dispatcher framework present in GPflow
+# not sure this can be fixed as the underlying kernel is a squared exponential that needs to be used for Kff
 @Kuu.register(SpectralInducingVariables, IFFMultipleSpectralBlock)
 def Kuu_IFF_block_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: IFFMultipleSpectralBlock, *, jitter: float = 0.0

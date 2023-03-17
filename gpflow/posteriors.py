@@ -50,7 +50,7 @@ from .inducing_variables import (
     RectangularSpectralInducingPoints,
 )
 
-from .kernels import Kernel, MultipleSpectralBlock
+from .kernels import Kernel, IFFMultipleSpectralBlock
 from .likelihoods import Gaussian
 from .mean_functions import MeanFunction
 from .utilities import Dispatcher, add_likelihood_noise_cov, assert_params_false
@@ -1048,13 +1048,15 @@ def _get_posterior_base_case(
     # independent single output
     return IndependentPosteriorSingleOutput
 
-@get_posterior_class.register(MultipleSpectralBlock, RectangularSpectralInducingPoints)
+#NOTE -- I don't think I need this here
+"""
+@get_posterior_class.register(IFFMultipleSpectralBlock, RectangularSpectralInducingPoints)
 def _get_posterior_base_spectral_case(
-    kernel: MultipleSpectralBlock, inducing_variable: RectangularSpectralInducingPoints
+    kernel: IFFMultipleSpectralBlock, inducing_variable: RectangularSpectralInducingPoints
 ) -> Type[BasePosterior]:
     # independent single output
     return IndependentPosteriorSingleOutput
-
+"""
 
 @get_posterior_class.register(kernels.MultioutputKernel, InducingPoints)
 def _get_posterior_fully_correlated_mo(
