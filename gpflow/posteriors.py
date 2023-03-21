@@ -564,6 +564,130 @@ class SGPRPosterior(AbstractPosterior):
         return self._conditional_with_precompute(temp_cache, Xnew, full_cov, full_output_cov)
 
 
+class IFF_SGPRPosterior(AbstractPosterior):
+    """
+    #NOTE -- only to be used with IFF model
+    provides implementation of ELBO just like in the paper
+    predictive equations stay the same.
+    This class represents posteriors which can be derived from SGPR
+    models to compute faster predictions on unseen points.
+    """
+
+    #NOTE -- this is temporarily deactivated due to some conflicts with Spectral Inducing Points
+    #@check_shapes(
+    #    "data[0]: [N, D]",
+    #    "data[1]: [N, Q]",
+    #    "inducing_variable: [M, D, 1]",
+    #)
+    def __init__(
+        self,
+        kernel: Kernel,
+        data: RegressionData,
+        inducing_variable: InducingPoints,
+        likelihood: Gaussian,
+        num_latent_gps: int,
+        mean_function: MeanFunction,
+        *,
+        precompute_cache: Optional[PrecomputeCacheType],
+    ) -> None:
+        X, Y = data
+        super().__init__(kernel, X, mean_function=mean_function)
+        self.Y_data = Y
+        self.likelihood = likelihood
+        self.inducing_variable = inducing_variable
+        self.num_latent_gps = num_latent_gps
+
+        if precompute_cache is not None:
+            self.update_cache(precompute_cache)
+
+    @inherit_check_shapes
+    def _conditional_with_precompute(
+        self,
+        cache: Tuple[tf.Tensor, ...],
+        Xnew: TensorType,
+        full_cov: bool = False,
+        full_output_cov: bool = False,
+    ) -> MeanAndVariance:
+        """
+        Computes predictive mean and (co)variance at Xnew, *excluding* mean_function.
+        Relies on cached alpha and Qinv.
+        """
+        assert_params_false(self._conditional_with_precompute, full_output_cov=full_output_cov)
+
+        L, LB, c = cache
+
+        Kus = Kuf(self.inducing_variable, self.kernel, Xnew)
+        tmp1 = tf.linalg.triangular_solve(L, Kus, lower=True)
+        tmp2 = tf.linalg.triangular_solve(LB, tmp1, lower=True)
+        mean = tf.linalg.matmul(tmp2, c, transpose_a=True)
+        if full_cov:
+            var = (
+                self.kernel(Xnew)
+                + tf.linalg.matmul(tmp2, tmp2, transpose_a=True)
+                - tf.linalg.matmul(tmp1, tmp1, transpose_a=True)
+            )
+            var = tf.tile(var[None, ...], [self.num_latent_gps, 1, 1])  # [P, N, N]
+        else:
+            var = (
+                self.kernel(Xnew, full_cov=False)
+                + tf.reduce_sum(tf.square(tmp2), 0)
+                - tf.reduce_sum(tf.square(tmp1), 0)
+            )
+            var = tf.tile(var[:, None], [1, self.num_latent_gps])
+
+        return mean, var
+
+    @check_shapes(
+        "return[0]: [M, M]",
+        "return[1]: [M, M]",
+        "return[2]: [M, D]",
+    )
+    def _precompute(self) -> Tuple[PrecomputedValue, ...]:
+        assert self.mean_function is not None
+
+        X_data = cast(tf.Tensor, self.X_data)
+        num_inducing = self.inducing_variable.num_inducing
+        err = self.Y_data - self.mean_function(X_data)
+
+        kuf = Kuf(self.inducing_variable, self.kernel, X_data)
+        kuu = Kuu(self.inducing_variable, self.kernel, jitter=default_jitter())
+
+        sigma_sq = tf.squeeze(self.likelihood.variance_at(X_data), axis=-1)
+        sigma = tf.sqrt(sigma_sq)
+
+        L = tf.linalg.cholesky(kuu)  # cache alpha, qinv
+        A = tf.linalg.triangular_solve(L, kuf / sigma, lower=True)
+        B = tf.linalg.matmul(A, A, transpose_b=True) + tf.eye(
+            num_inducing, dtype=default_float()
+        )  # cache qinv
+        LB = tf.linalg.cholesky(B)  # cache alpha
+        Aerr = tf.linalg.matmul(A, err / sigma[..., None])
+        c = tf.linalg.triangular_solve(LB, Aerr, lower=True)
+
+        D = err.shape[1]
+        M = X_data.shape[0]
+        D_dynamic = D is None
+        M_dynamic = M is None
+
+        return (
+            PrecomputedValue(L, (M_dynamic, M_dynamic)),
+            PrecomputedValue(LB, (M_dynamic, M_dynamic)),
+            PrecomputedValue(c, (M_dynamic, D_dynamic)),
+        )
+
+    @inherit_check_shapes
+    def _conditional_fused(
+        self, Xnew: TensorType, full_cov: bool = False, full_output_cov: bool = False
+    ) -> MeanAndVariance:
+        """
+        Compute the mean and variance of the latent function at some new points
+        Xnew. Does not make use of caching
+        """
+        temp_cache = tuple(c.value for c in self._precompute())
+        return self._conditional_with_precompute(temp_cache, Xnew, full_cov, full_output_cov)
+
+
+
 class VGPPosterior(AbstractPosterior):
     @check_shapes(
         "X: [N, D]",
@@ -1048,7 +1172,7 @@ def _get_posterior_base_case(
     # independent single output
     return IndependentPosteriorSingleOutput
 
-#NOTE -- I don't think I need this here
+#NOTE -- I don't think I need this here since we are using the SGPR model
 """
 @get_posterior_class.register(IFFMultipleSpectralBlock, RectangularSpectralInducingPoints)
 def _get_posterior_base_spectral_case(

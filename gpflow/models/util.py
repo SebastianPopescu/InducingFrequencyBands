@@ -20,12 +20,12 @@ from check_shapes import check_shapes
 
 from ..base import AnyNDArray
 from ..config import default_float
-from ..inducing_variables import InducingPoints, InducingVariables, RectangularSpectralInducingPoints
+from ..inducing_variables import InducingPoints, SpectralInducingPoints, InducingVariables, RectangularSpectralInducingPoints
 from .model import BayesianModel
 from .training_mixins import Data, ExternalDataTrainingLossMixin
 
 InducingVariablesLike = Union[InducingVariables, tf.Tensor, AnyNDArray]
-InducingPointsLike = Union[InducingPoints, tf.Tensor, AnyNDArray]
+InducingPointsLike = Union[InducingPoints, SpectralInducingPoints, tf.Tensor, AnyNDArray]
 
 
 def inducingpoint_wrapper(inducing_variable: InducingVariablesLike) -> InducingVariables:
