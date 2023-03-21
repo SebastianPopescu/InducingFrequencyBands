@@ -204,11 +204,12 @@ print(NYQUIST_FREQ)
 print('**********************')
 
 MAXFREQ=10.
-N_COMPONENTS = 50
-MAXITER = 5000
+N_COMPONENTS = 10
+MAXITER = 1000
 
 
-means_np, bandwidths_np, powers_np = riemann_approximate_rbf_initial_components([MAXFREQ], n_components=N_COMPONENTS, x_interval = [X.max() -  X.min()])
+#means_np, bandwidths_np, powers_np = riemann_approximate_rbf_initial_components([MAXFREQ], n_components=N_COMPONENTS, x_interval = [X.max() -  X.min()])
+means_np, bandwidths_np, powers_np = np_disjoint_initial_components([MAXFREQ], n_components=N_COMPONENTS, x_interval = [X.max() -  X.min()])
 
 means_np = means_np.astype(np.float64)
 bandwidths_np = bandwidths_np.astype(np.float64)
@@ -225,11 +226,9 @@ print(bandwidths_np.shape)
 #bandwidths_np = np.ones((1,N_COMPONENTS)) 
 #powers_np = np.ones(N_COMPONENTS, )
 
-
 powers_np = [np.float64(np_float)  for np_float in powers_np]
 print('powers_np')
 print(powers_np)
-
 
 #kern = gpflow.kernels.SummedSpectralBlock(powers = powers_np, means = means_np, bandwidths = bandwidths_np, SpectralComponent='Block')
 kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
@@ -245,38 +244,28 @@ spectral_block_1a = rbf_spectral_density(np.linspace(0, MAXFREQ, 1000)
     )
 ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), label='RBF spectral density', linewidth=.8)
 
-plt.savefig('./figures/svgp_freq_bands_sym_rec_init.png')
+plt.savefig('./figures/sgpr_freq_bands_sym_rec_init.png')
 plt.close()
 
-ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
-
-print('-------- Inducing Variables --------')
-print(ind_var)
-
+M = 20
+Z = X[
+    :M, :
+].copy()  # Initialize inducing locations to the first M inputs in the dataset
 
 #m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
-m = gpflow.models.SGPR((X, Y), kern, ind_var)
+m = gpflow.models.SGPR((X, Y), kern, Z)
 
-print('--------------------------')
-print('trainable variables at the beginning')
-print(m.trainable_variables)
-gpflow.utilities.set_trainable(m.kernel.bandwidths, False)
-gpflow.utilities.set_trainable(m.kernel.means, False)
-#gpflow.utilities.set_trainable(m.kernel.powers, False)
-print('--------------------------')
-print('trainable variables after deactivation')
-print(m.trainable_variables)
 
-opt = gpflow.optimizers.Scipy()
-#opt = tf.optimizers.Adam()
-
-opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=100))
-
+opt_logs = gpflow.optimizers.Scipy().minimize(
+    m.training_loss,
+    variables=m.trainable_variables,
+    method="l-bfgs-b",
+    options={"disp": True, "maxiter": MAXITER},
+)
 
 print('---- After training -----')
 print('means_np')
 print(tf.convert_to_tensor(kern.means).numpy())
-
 
 print('bandwidths_np')
 print(tf.convert_to_tensor(kern.bandwidths).numpy())
@@ -315,7 +304,8 @@ def plot(title=""):
     plt.legend(loc="lower right")
 
 plot("Predictions after training")
-
+plt.savefig('./figures/moments_sgpr_multi_sinc_toy_data.png')
+plt.close()
 
 def plot_samples(title=""):
     plt.figure(figsize=(12, 4))
@@ -348,7 +338,7 @@ def plot_samples(title=""):
     plt.legend(loc="lower right")
 
 plot_samples("Sample Predictions after training")
-plt.savefig('./figures/sample_svgp_freq_bands_toy_data.png')
+plt.savefig('./figures/sample_sgpr_multi_sinc_toy_data.png')
 plt.close()
 
 
@@ -379,9 +369,9 @@ for _ in range(N_COMPONENTS):
         use_blocks = True)
 
     ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SB_'+str(_), linewidth=.8)
-EXPERIMENT_NAME = 'periodogram_init_svgp_freq_bands'
 
-plt.savefig('./figures/svgp_freq_bands_toy_data_periodogram.png')
+
+plt.savefig('./figures/sgpr_multi_sinc_toy_data_periodogram.png')
 plt.close()
 
 

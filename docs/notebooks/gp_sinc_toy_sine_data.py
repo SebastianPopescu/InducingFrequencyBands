@@ -175,7 +175,6 @@ means_np = np.ones((1,1))
 bandwidths_np = np.ones((1,1))
 powers_np = [1.0]
 
-
 powers_np = [np.float64(np_float) for np_float in powers_np]
 print('powers_np')
 print(powers_np)

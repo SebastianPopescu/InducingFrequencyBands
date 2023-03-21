@@ -251,10 +251,11 @@ plt.close()
 
 m = gpflow.models.GPR( data = (X, Y), kernel = kern)
 
-
-opt = gpflow.optimizers.Scipy()
-opt_logs = opt.minimize(
-    m.training_loss, m.trainable_variables, options=dict(maxiter=MAXITER)
+opt_logs = gpflow.optimizers.Scipy().minimize(
+    m.training_loss,
+    variables=m.trainable_variables,
+    method="l-bfgs-b",
+    options={"disp": True, "maxiter": MAXITER},
 )
 
 
