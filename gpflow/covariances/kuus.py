@@ -20,7 +20,6 @@ from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, Sp
 from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel 
 from .dispatch import Kuu
 
-
 @Kuu.register(InducingPoints, Kernel)
 @check_shapes(
     "inducing_variable: [M, D, 1]",
@@ -34,28 +33,15 @@ def Kuu_kernel_inducingpoints(
     return Kzz
 
 
-@Kuu.register(SpectralInducingVariables, SpectralKernel)
+@Kuu.register(InducingPoints, SpectralKernel)
 def Kuu_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, *, jitter: float = 0.0
+    inducing_variable: InducingPoints, kernel: SpectralKernel, *, jitter: float = 0.0
 ) -> tf.Tensor:
     
     Kzz = kernel(inducing_variable.Z)
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-
-#NOTE -- this completly breaks the dispatcher framework present in GPflow
-@Kuu.register(SpectralInducingVariables, MultipleSpectralBlock)
-def Kuu_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
-) -> tf.Tensor:
-    
-    Kzz = tf.linalg.diag(kernel.powers)
-    Kzz = tf.cast(Kzz, default_float())
-    print('Kzz -- inside Kuu dispatcher')
-    print(Kzz)
-
-    return Kzz
 
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(

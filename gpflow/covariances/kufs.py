@@ -34,58 +34,17 @@ def Kuf_kernel_inducingpoints(
     return kernel(inducing_variable.Z, Xnew)
 
 
-@Kuf.register(SpectralInducingVariables, SpectralKernel, TensorLike)
+@Kuf.register(InducingPoints, SpectralKernel, TensorLike)
 @check_shapes(
     "inducing_variable: [M, D, 1]",
     "Xnew: [batch..., N, D]",
     "return: [M, batch..., N]",
 )
 def Kuf_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, Xnew: TensorType
+    inducing_variable: InducingPoints, kernel: SpectralKernel, Xnew: TensorType
 ) -> tf.Tensor:
     return kernel(inducing_variable.Z, Xnew)
 
-
-# NOTE -- this completly breaks fthe dispatcher method in GPflow
-@Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
-#@check_shapes(
-#    "inducing_variable: [M, D, 1]",
-#    "Xnew: [batch..., N, D]",
-#    "return: [M, batch..., N]",
-#)
-def Kuf_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, Xnew: TensorType
-) -> tf.Tensor:
-
-    _means = kernel.means # expected shape [D, M]
-    _bandwidths = kernel.bandwidths # expected shape [D, M]
-    _powers = kernel.powers # expected shape [M, ]
-
-    print('--- inside spectral Kuf dfispatcher ------')
-
-    sine_term = tf.reduce_prod( 2.0 * tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]#TODO -- need to also write a dispatcher that can be used with the Sinc kernel
-    
-    print('sine term')
-    print(sine_term)
-    
-    cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
-    print('cosine term') 
-    print(cosine_term)
-    
-    pre_multiplier = _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
-    print('pre_multiplier')
-    print(pre_multiplier[..., None])
-
-    print('output')
-    print(pre_multiplier[..., None] * sine_term * cosine_term)
-
-    return pre_multiplier[..., None] * sine_term * cosine_term # expected shape (M, N)
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)
 @check_shapes(
