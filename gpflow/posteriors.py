@@ -563,7 +563,7 @@ class SGPRPosterior(AbstractPosterior):
         temp_cache = tuple(c.value for c in self._precompute())
         return self._conditional_with_precompute(temp_cache, Xnew, full_cov, full_output_cov)
 
-
+#TODO -- need to update this whole class
 class IFF_SGPRPosterior(AbstractPosterior):
     """
     #NOTE -- only to be used with IFF model

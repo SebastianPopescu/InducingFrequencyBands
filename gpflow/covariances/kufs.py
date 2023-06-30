@@ -47,7 +47,8 @@ def Kuf_kernel_inducingpoints(
 
 
 # NOTE -- this completly breaks the dispatcher method in GPflow
-# not sure this can be fixed as the underlying kernel is a squared exponential that needs to be used for Kff
+# not sure this can be fixed as the underlying kernel is a squared exponential that 
+# needs to be used for Kff
 @Kuf.register(SpectralInducingVariables, IFFMultipleSpectralBlock, TensorLike)
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",
@@ -55,7 +56,8 @@ def Kuf_kernel_inducingpoints(
 #    "return: [M, batch..., N]",
 #)
 def Kuf_IFF_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: IFFMultipleSpectralBlock, Xnew: TensorType
+    inducing_variable: SpectralInducingVariables, kernel: IFFMultipleSpectralBlock, 
+    Xnew: TensorType
 ) -> tf.Tensor:
 
     _means = kernel.means # expected shape [D, M]
@@ -63,10 +65,12 @@ def Kuf_IFF_block_spectral_kernel_inducingpoints(
     _variance = kernel.variance # expected shape TODO -- add it
     print('--- inside spectral Kuf dfispatcher ------')
  
-    cosine_term = 2.0 * tf.reduce_prod( tf.cos( 2.0 * math.pi * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
+    cosine_term = 2.0 * tf.reduce_prod( tf.cos( 2.0 * math.pi * 
+                                               tf.multiply(
+            tf.transpose(_means)[..., None], # [M, D, 1]
+            tf.transpose(Xnew)[None, ...] # [1, D, N]
+                                                ) #[M, D, N]
+                                                ), axis = 1) #[M, N]
     print('cosine term') 
     print(cosine_term)
     

@@ -35,10 +35,12 @@ def Kuu_kernel_inducingpoints(
 
 
 #NOTE -- this completly breaks the dispatcher framework present in GPflow
-# not sure this can be fixed as the underlying kernel is a squared exponential that needs to be used for Kff
+# not sure this can be fixed as the underlying kernel is a squared exponential that 
+# needs to be used for Kff
 @Kuu.register(SpectralInducingVariables, IFFMultipleSpectralBlock)
 def Kuu_IFF_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: IFFMultipleSpectralBlock, *, jitter: float = 0.0
+    inducing_variable: SpectralInducingVariables, kernel: IFFMultipleSpectralBlock, 
+    *, jitter: float = 0.0
 ) -> tf.Tensor:
     
     Kzz = tf.linalg.diag(tf.math.reciprocal(kernel.bandwidths))

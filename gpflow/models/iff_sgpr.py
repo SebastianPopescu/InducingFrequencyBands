@@ -108,133 +108,6 @@ class IFF_SGPR_deprecated(IFF_SGPRBase_deprecated):
     def maximum_log_likelihood_objective(self) -> tf.Tensor:  # type: ignore[override]
         return self.elbo()
 
-    """
-    @check_shapes(
-        "return.sigma_sq: [N]",
-        "return.sigma: [N]",
-        "return.A: [M, N]",
-        "return.B: [M, M]",
-        "return.LB: [M, M]",
-        "return.AAT: [M, M]",
-    )
-    """
-
-
-    def _common_calculation(self) -> "SGPR.CommonTensors":
-        """
-        Matrices used in log-det calculation
-
-        :return:
-            * :math:`σ²`,
-            * :math:`σ`,
-            * :math:`A = L⁻¹K_{uf}/σ`, where :math:`LLᵀ = Kᵤᵤ`,
-            * :math:`B = AAT+I`,
-            * :math:`LB` where :math`LBLBᵀ = B`,
-            * :math:`AAT = AAᵀ`,
-        """
-        """
-        x, _ = self.data  # [N]
-        iv = self.inducing_variable  # [M]
-
-        sigma_sq = tf.squeeze(self.likelihood.variance_at(x), axis=-1)  # [N]
-        sigma = tf.sqrt(sigma_sq)  # [N]
-
-        kuf = Kuf(iv, self.kernel, x)  # [M, N]
-        kuu = Kuu(iv, self.kernel, jitter=default_jitter())  # [M, M]
-        L = tf.linalg.cholesky(kuu)  # [M, M]
-
-        # Compute intermediate matrices
-        A = tf.linalg.triangular_solve(L, kuf / sigma, lower=True)
-        AAT = tf.linalg.matmul(A, A, transpose_b=True)
-        B = add_noise_cov(AAT, tf.cast(1.0, AAT.dtype))
-        LB = tf.linalg.cholesky(B)
-
-        return self.CommonTensors(sigma_sq, sigma, A, B, LB, AAT, L)
-        """
-        pass
-        
-    @check_shapes(
-        "return: []",
-    )
-    def logdet_term(self, common: "SGPR.CommonTensors") -> tf.Tensor:
-        r"""
-        Bound from Jensen's Inequality:
-
-        .. math::
-            \log |K + σ²I| <= \log |Q + σ²I| + N * \log (1 + \textrm{tr}(K - Q)/(σ²N))
-
-        :param common: A named tuple containing matrices that will be used
-        :return: log_det, lower bound on :math:`-.5 * \textrm{output_dim} * \log |K + σ²I|`
-        """
-        
-        """
-        #NOTE -- previous version
-        sigma_sq = common.sigma_sq
-        LB = common.LB
-        AAT = common.AAT
-
-        x, y = self.data
-        outdim = to_default_float(tf.shape(y)[1])
-        kdiag = self.kernel(x, full_cov=False)
-
-        # tr(K) / σ²
-        trace_k = tf.reduce_sum(kdiag / sigma_sq)
-        # tr(Q) / σ²
-        trace_q = tf.reduce_sum(tf.linalg.diag_part(AAT))
-        # tr(K - Q) / σ²
-        trace = trace_k - trace_q
-
-        # 0.5 * log(det(B))
-        half_logdet_b = tf.reduce_sum(tf.math.log(tf.linalg.diag_part(LB)))
-
-        # sum log(σ²)
-        log_sigma_sq = tf.reduce_sum(tf.math.log(sigma_sq))
-
-        logdet_k = -outdim * (half_logdet_b + 0.5 * log_sigma_sq + 0.5 * trace)
-        return logdet_k
-        """
-
-        x, y = self.data
-        outdim = to_default_float(tf.shape(y)[1])
-
-        iv = self.inducing_variable  # [M]
-        M = iv.num_inducing
-
-        #NOTE-- necesarry to get kernel so as to have access to frequency bands data
-        kern = self.kernel
-        _bandwidths = self.kernel.bandwidths
-
-        log_det = tf.reduce_sum(tf.math.log(_bandwidths))
-        A = 
-        log_det+= 
-
-        return logdet_k
-
-    @check_shapes(
-        "return: []",
-    )
-    def quad_term(self, common: "SGPR.CommonTensors") -> tf.Tensor:
-        """
-        :param common: A named tuple containing matrices that will be used
-        :return: Lower bound on -.5 yᵀ(K + σ²I)⁻¹y
-        """
-        sigma = common.sigma
-        A = common.A
-        LB = common.LB
-
-        x, y = self.data
-        err = (y - self.mean_function(x)) / sigma[..., None]
-
-        Aerr = tf.linalg.matmul(A, err)
-        c = tf.linalg.triangular_solve(LB, Aerr, lower=True)
-
-        # σ⁻² yᵀy
-        err_inner_prod = tf.reduce_sum(tf.square(err))
-        c_inner_prod = tf.reduce_sum(tf.square(c))
-
-        quad = -0.5 * (err_inner_prod - c_inner_prod)
-        return quad
-
     @check_shapes(
         "return: []",
     )
@@ -244,14 +117,41 @@ class IFF_SGPR_deprecated(IFF_SGPRBase_deprecated):
         likelihood. For a derivation of the terms in here, see the associated
         SGPR notebook.
         """
-        common = self._common_calculation()
-        output_shape = tf.shape(self.data[-1])
-        num_data = to_default_float(output_shape[0])
-        output_dim = to_default_float(output_shape[1])
-        const = -0.5 * num_data * output_dim * np.log(2 * np.pi)
-        logdet = self.logdet_term(common)
-        quad = self.quad_term(common)
-        return const + logdet + quad
+        #TODO -- need to use the custom Talay Cheema ELBO for IFF-SGPR here
+        #common = self._common_calculation()
+        #output_shape = tf.shape(self.data[-1])
+        #num_data = to_default_float(output_shape[0])
+        #output_dim = to_default_float(output_shape[1])
+        #const = -0.5 * num_data * output_dim * np.log(2 * np.pi)
+        #logdet = self.logdet_term(common)
+        #quad = self.quad_term(common)
+        #return const + logdet + quad
+
+        #NOTE -- corresponds to equation 15 from Appendix of IFF paper
+
+        #TODO -- introduce self.spectrum_inducing_points to be the 
+        # diagonal term of the S matrix 
+        # (contains the Z_{m} evaluated at the PSD of the underlying kernel)
+
+        log_determinant = tf.reduce_sum(tf.math.log(self.spectrum_inducing_points))
+        #TODO -- need to introduce the narrow bandwidth value as self.epsilon
+        log_determinant+= - self.kernel.num_inducing * self.kernel.dim_input * self.epsilon
+        log_determinant+= self.num_data * tf.math.log(self.likelihood.variance)
+
+        #NOTE -- __gamma_sq : squared L2 norm of output data
+        _gamma_sq = tf.reduce_sum(tf.square(self.data[1]))
+        mahalanobis_term = -tf.math.reciprocal(self.likelihood.variance) * _gamma_sq
+
+        #NOTE -- A: 
+        mahalanobis_term+= tf.math.reciprocal(tf.square(self.likelihood.variance))
+
+        trace_term  =
+        
+        elbo = 
+
+        return -0.5 * elbo
+
+
 
     @inherit_check_shapes
     def predict_f(
@@ -342,7 +242,7 @@ class IFF_SGPR_deprecated(IFF_SGPRBase_deprecated):
         return mu, cov
 
 
-class SGPR_with_posterior(SGPR_deprecated):
+class IFF_SGPR_with_posterior(IFF_SGPR_deprecated):
     """
     Sparse Variational GP regression.
     The key reference is :cite:t:`titsias2009variational`.
@@ -400,7 +300,7 @@ class SGPR_with_posterior(SGPR_deprecated):
         )
 
 
-class SGPR(SGPR_with_posterior):
+class IFF_SGPR(IFF_SGPR_with_posterior):
     # subclassed to ensure __class__ == "SGPR"
 
-    __doc__ = SGPR_deprecated.__doc__  # Use documentation from SGPR_deprecated.
+    __doc__ = IFF_SGPR_deprecated.__doc__  # Use documentation from SGPR_deprecated.

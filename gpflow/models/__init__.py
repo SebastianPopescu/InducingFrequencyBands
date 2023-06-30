@@ -25,6 +25,7 @@ from .gpmc import GPMC
 from .gpr import GPR
 from .model import BayesianModel, GPModel
 from .sgpmc import SGPMC
+from .iff_sgpr import IFF_SGPR
 from .sgpr import GPRFITC, SGPR
 from .svgp import SVGP
 from .training_mixins import ExternalDataTrainingLossMixin, InternalDataTrainingLossMixin
@@ -43,6 +44,7 @@ __all__ = [
     "GPRFITC",
     "InternalDataTrainingLossMixin",
     "SGPMC",
+    "IFF_SGPR",
     "SGPR",
     "SVGP",
     "VGP",
