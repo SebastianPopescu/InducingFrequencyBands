@@ -50,7 +50,6 @@ from .spectral import (
     MultipleSpectralBlock, 
     SpectralBlock, 
     MixtureSpectralGaussian,
-    SummedSpectralBlock, 
     SpectralDiracDeltaBlock
 )
 
@@ -113,7 +112,6 @@ __all__ = [
     "IsotropicSpectralStationary",
     "AnisotropicSpectralStationary",
     "SpectralKernel",
-    "SummedSpectralBlock",
     "SpectralSum",
     "SpectralProduct",
     "SpectralDiracDeltaBlock",

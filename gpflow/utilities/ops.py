@@ -122,6 +122,8 @@ def square_distance(X: tf.Tensor, X2: Optional[tf.Tensor]) -> tf.Tensor:
     return dist
 
 
+
+#TODO -- need to test this function
 @check_shapes(
     "X: [batch..., N, D]",
     "X2: [batch2..., N2, D]",
@@ -144,6 +146,7 @@ def difference_matrix(X: tf.Tensor, X2: Optional[tf.Tensor]) -> tf.Tensor:
     diff = tf.reshape(diff, tf.concat((Xshape[:-1], X2shape[:-1], [Xshape[-1]]), 0))
     return diff
 
+#TODO -- need to test this function
 def batched_difference_matrix(X: tf.Tensor, X2: Optional[tf.Tensor]) -> tf.Tensor:
     """
     Returns (X - X2ᵀ)

@@ -88,7 +88,7 @@ class _Values(enum.Enum):
     will be `GPFLOW_SUMMARY_FMT`."""
 
     INT = np.int32
-    FLOAT = np.float64
+    FLOAT = np.float32
     POSITIVE_BIJECTOR = "softplus"
     POSITIVE_MINIMUM = 0.0
     SUMMARY_FMT = "fancy_grid"

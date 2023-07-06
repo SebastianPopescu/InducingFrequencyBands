@@ -73,7 +73,8 @@ class BayesianModel(Module, metaclass=abc.ABCMeta):
         Training loss definition. To allow MAP (maximum a-posteriori) estimation,
         adds the log density of all priors to maximum_log_likelihood_objective().
         """
-        return -(self.maximum_log_likelihood_objective(*args, **kwargs) + self.log_prior_density())
+        #TODO -- fix this hack
+        return -(tf.cast(self.maximum_log_likelihood_objective(*args, **kwargs), tf.float32) + tf.cast(self.log_prior_density(), tf.float32))
 
     @abc.abstractmethod
     @check_shapes(

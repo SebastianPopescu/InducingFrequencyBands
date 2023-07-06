@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import tensorflow as tf
+import numpy as np
 from check_shapes import check_shapes
 
 from ..config import default_float
@@ -43,19 +44,78 @@ def Kuu_block_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
+def midpoint_rule(x, std, a, b, n):
 
-#NOTE -- this completly breaks the dispatcher framework present in GPflow
+    # Calculate the width of each subinterval
+    h = (b - a) / n
+    
+    # Calculate the midpoint values for each subinterval
+    mean_midpoints = tf.linspace(a + h/2, b - h/2, n)
+    
+    # Evaluate the function at the midpoint values
+    f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
+    
+    # Calculate the approximate integral using the midpoint rule formula
+    integral_approx = h * tf.reduce_sum(f_midpoints)
+    
+    return integral_approx
+
+
+def burmann_series_approx_erf(x, mean, std):
+
+    print('---burmann series----')
+    print(x)
+    print(mean)
+    print(std)
+    print(tf.math.sqrt(2.))
+
+
+    #\operatorname{erf}\left( \frac{w_{1}-w'}{\sqrt{\frac{2\alpha}{\pi^{2}}}} \right) 
+    res = burmann_series_second_order_approx((x-mean)/(tf.math.sqrt(2.)*std))
+
+    return res
+
+
+def burmann_series_second_order_approx(x):
+
+    #\operatorname{erf}\left( x \right) \approx \frac{2}{\sqrt{\pi}}
+    #\operatorname{sgn}\left( x \right) \sqrt{1 - \exp{-x^{2}}} 
+    #\left[ \frac{\sqrt{\pi}}{2} + \frac{31}{200}\exp{-x^{2}} 
+    #- \frac{341}{8000}\exp{-2x^{2}}\right]   
+
+    res = 2./tf.sqrt(np.pi) * tf.math.sign(x) * tf.sqrt(1 - tf.math.exp(-x**2)) 
+    res *= (np.pi/2. + 31./200. * tf.math.exp(-x**2) - 341./8000. * tf.math.exp(-2.*x**2))
+    return res
+
 @Kuu.register(SpectralInducingVariables, MultipleSpectralBlock)
 def Kuu_block_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
 ) -> tf.Tensor:
     
-    Kzz = tf.linalg.diag(kernel.powers)
-    Kzz = tf.cast(Kzz, default_float())
-    print('Kzz -- inside Kuu dispatcher')
-    print(Kzz)
+    #NOTE -- this is the unwindowed case
+    #Kzz = tf.linalg.diag(kernel.powers)
+    #Kzz = tf.cast(Kzz, default_float())
 
-    return Kzz
+    #NOTE -- implements the following integral but approximated numerically
+    #NOTE -- erf is implemented via the second order Burmann series approximation
+
+    num_approx_N = 100
+
+    Kzz = tf.linalg.diag(kernel.powers / (2. * kernel.bandwidths))
+
+    lower_limit = kernel.means - 0.5 * kernel.bandwidths
+    upper_limit = kernel.means + 0.5 * kernel.bandwidths
+    #TODO -- introduce the Gaussian window variable \alpha in the definition on the kernel
+    print('num_int_approx')
+    num_int_approx = midpoint_rule(upper_limit, std = kernel.alpha / np.pi**2, 
+                                   a = lower_limit, b = upper_limit, n = num_approx_N)
+    print(num_approx_N)
+    num_int_approx -= midpoint_rule(lower_limit, std = kernel.alpha / np.pi**2, 
+                                   a = lower_limit, b = upper_limit, n = num_approx_N)
+    print(num_approx_N)
+    Kzz *= tf.linalg.diag(num_int_approx)
+
+    return 2. * Kzz
 
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(

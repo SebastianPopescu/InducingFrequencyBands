@@ -532,6 +532,7 @@ class SGPRPosterior(AbstractPosterior):
         sigma_sq = tf.squeeze(self.likelihood.variance_at(X_data), axis=-1)
         sigma = tf.sqrt(sigma_sq)
 
+
         L = tf.linalg.cholesky(kuu)  # cache alpha, qinv
         A = tf.linalg.triangular_solve(L, kuf / sigma, lower=True)
         B = tf.linalg.matmul(A, A, transpose_b=True) + tf.eye(

@@ -286,6 +286,7 @@ class SGPR_deprecated(SGPRBase_deprecated):
         const = -0.5 * num_data * output_dim * np.log(2 * np.pi)
         logdet = self.logdet_term(common)
         quad = self.quad_term(common)
+
         return const + logdet + quad
 
     @inherit_check_shapes

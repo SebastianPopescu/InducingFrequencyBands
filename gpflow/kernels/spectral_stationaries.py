@@ -34,10 +34,9 @@ NormalizedActiveDims = Union[slice, AnyNDArray]
 class SpectralKernel(Module, metaclass=abc.ABCMeta):
     """
     The basic spectral kernel class. 
-    NOTE -- not sure if this is required here. Management of active dimensions is implemented here.
 
     :param active_dims: active dimensions, either a slice or list of
-        indices into the columns of X.
+        indices into the columns of X. #NOTE -- I don't think we make use of this.
     :param name: optional kernel name.
     """
 
@@ -340,12 +339,14 @@ class SpectralStationary(SpectralKernel):
         powers: TensorType, 
         means: TensorType, 
         bandwidths: TensorType,
+        alpha: TensorType,
         **kwargs: Any
     ) -> None:
         """
         :param powers: TODO
         :param means: TODO
-        :param bandwidths: TODO 
+        :param bandwidths: TODO
+        :param alpha: TODO 
         :param kwargs: accepts `name` and `active_dims`, which is a list or
             slice of indices which controls which columns of X are used (by
             default, all columns are used).
@@ -360,20 +361,25 @@ class SpectralStationary(SpectralKernel):
             powers,
             transform=Exp(),  # type: ignore
             name="powers",
+            dtype=tf.float32,
         )
 
         self.means = Parameter(
             means,
             transform=Exp(),  # type: ignore
             name="means",
+            dtype=tf.float32,
         )
 
         self.bandwidths = Parameter(
             bandwidths,
             transform=Exp(),  # type: ignore
             name="bandwidths",
+            dtype=tf.float32,
         )
         self._validate_ard_active_dims(self.means)
+
+        self.alpha = alpha
 
     @property
     def ard(self) -> bool:
@@ -383,6 +389,7 @@ class SpectralStationary(SpectralKernel):
         ndims: int = self.means.shape.ndims
         return ndims > 0
 
+    #TODO -- re-introduce check_shapes
     #@check_shapes(
     #    "X: [broadcast any...]",
     #    "return: [any...]",
@@ -391,7 +398,9 @@ class SpectralStationary(SpectralKernel):
         
         """
 
-        #NOTE -- For the general Spectral kernel case, but not for Inducing Frequency Bands, nor GP-MultiSinc
+        For the Sinc kernel case, but not for 
+        Inducing Frequency Bands, nor multi Sinc kernel case.
+
         :param X: expected shape [N, D]
         :param self.means: expected shape [D, ]
         
@@ -404,8 +413,10 @@ class SpectralStationary(SpectralKernel):
 
     @inherit_check_shapes
     def K_diag(self, X: TensorType) -> tf.Tensor:
+        #NOTE -- this is to be used only for multi sinc kernels
         return tf.fill(tf.shape(X)[:-1], tf.squeeze(tf.reduce_sum(self.powers)))
 
+#NOTE -- I am not sure I am actually using this class anywhere
 class IsotropicSpectralStationary(SpectralStationary):
     """
     Base class for isotropic stationary spectral kernels, i.e. kernels that only
@@ -466,7 +477,7 @@ class AnisotropicSpectralStationary(SpectralStationary):
     input dimension.
     """
 
-    #TODO -- reintroduce these at a latter point
+    #TODO -- re-introduce check_Shapes
     #@check_shapes(
     #    "variance: []",
     #    "lengthscales: [broadcast n_active_dims]",
@@ -476,6 +487,7 @@ class AnisotropicSpectralStationary(SpectralStationary):
         powers: TensorType, 
         means: TensorType,
         bandwidths: TensorType, 
+        alpha: TensorType,
         **kwargs: Any
     ) -> None:
         
@@ -484,11 +496,7 @@ class AnisotropicSpectralStationary(SpectralStationary):
             slice of indices which controls which columns of X are used (by
             default, all columns are used).
         """
-        super().__init__(powers, means, bandwidths, **kwargs)
-
-        #NOTE -- not sure why we need this here again since they get created in the super().__init__ part
-        #if self.ard:
-        #    self.lengthscales = Parameter(self.lengthscales.numpy())
+        super().__init__(powers, means, bandwidths, alpha,  **kwargs)
 
     @inherit_check_shapes
     def K(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:

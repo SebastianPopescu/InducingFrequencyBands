@@ -45,9 +45,8 @@ def Kuf_kernel_inducingpoints(
 ) -> tf.Tensor:
     return kernel(inducing_variable.Z, Xnew)
 
-
-# NOTE -- this completly breaks fthe dispatcher method in GPflow
 @Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
+#TODO -- re-introduce the check_shapes 
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",
 #    "Xnew: [batch..., N, D]",
@@ -61,29 +60,21 @@ def Kuf_block_spectral_kernel_inducingpoints(
     _bandwidths = kernel.bandwidths # expected shape [D, M]
     _powers = kernel.powers # expected shape [M, ]
 
-    print('--- inside spectral Kuf dfispatcher ------')
+    print('--- inside sine_term Kuf ---')
+    print(_bandwidths)
+    print(Xnew)
 
-    sine_term = tf.reduce_prod( 2.0 * tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
+    sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
-    ), axis = 1) #[M, N]#TODO -- need to also write a dispatcher that can be used with the Sinc kernel
-    
-    print('sine term')
-    print(sine_term)
+    ), axis = 1) #[M, N]
     
     cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
-    print('cosine term') 
-    print(cosine_term)
-    
-    pre_multiplier = _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
-    print('pre_multiplier')
-    print(pre_multiplier[..., None])
-
-    print('output')
-    print(pre_multiplier[..., None] * sine_term * cosine_term)
+     
+    pre_multiplier = 2. * _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
 
     return pre_multiplier[..., None] * sine_term * cosine_term # expected shape (M, N)
 

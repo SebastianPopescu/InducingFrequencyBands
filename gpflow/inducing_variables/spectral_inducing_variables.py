@@ -74,21 +74,6 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
         super().__init__(name=name)
         self.kern = kern
 
-        """
-        #TODO -- I think this might cause some problems with shape_check in posteriors.py
-        if not isinstance(means, (tf.Variable, tfp.util.TransformedVariable)):
-            means = Parameter(means, transform=positive())
-        self.means = means
-
-        if not isinstance(bandwidths, (tf.Variable, tfp.util.TransformedVariable)):
-            bandwidths = Parameter(bandwidths, transform=positive())
-        self.bandwidths = bandwidths
-
-        if not isinstance(variances, (tf.Variable, tfp.util.TransformedVariable)):
-            variances = Parameter(variances, transform=positive())
-        self.variances = variances
-        """
-
     @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
     @check_shapes(
         "return: []",
