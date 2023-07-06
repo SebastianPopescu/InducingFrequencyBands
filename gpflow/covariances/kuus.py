@@ -99,17 +99,17 @@ def Kuu_block_spectral_kernel_inducingpoints(
 
     lower_limit = kernel.means - 0.5 * kernel.bandwidths
     upper_limit = kernel.means + 0.5 * kernel.bandwidths
-    #TODO -- introduce the Gaussian window variable \alpha in the definition on the kernel
-    print('num_int_approx')
+    
     num_int_approx = midpoint_rule(upper_limit, std = kernel.alpha / np.pi**2, 
                                    a = lower_limit, b = upper_limit, n = num_approx_N)
-    print(num_approx_N)
+    
     num_int_approx -= midpoint_rule(lower_limit, std = kernel.alpha / np.pi**2, 
                                    a = lower_limit, b = upper_limit, n = num_approx_N)
-    print(num_approx_N)
+    
     Kzz *= tf.linalg.diag(num_int_approx)
 
-    return 2. * Kzz
+    #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
+    return tf.squeeze(2. * Kzz,axis=0)
 
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(
