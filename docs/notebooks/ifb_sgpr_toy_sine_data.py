@@ -90,8 +90,8 @@ def make_component_spectrum(x, mean, bandwidth, variance, use_blocks=True):
     
     return spectrum
 
-X = X.astype(np.float32)
-Y = Y.astype(np.float32)
+X = X.astype(np.float64)
+Y = Y.astype(np.float64)
 Y = Y.ravel()
 
 print('shape of data')
@@ -107,8 +107,9 @@ print(NYQUIST_FREQ)
 print('**********************')
 
 MAXFREQ = 10.
+assert MAXFREQ < NYQUIST_FREQ, "MAXFREQ has to be lower than the Nyquist frequency"
 N_COMPONENTS = 10
-MAXITER = 5000
+MAXITER = 1000
 
 means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(X.reshape((-1,1)), 
                                                                                         Y.ravel(), 
@@ -116,8 +117,9 @@ means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_com
                                                                                         n_components=N_COMPONENTS, 
                                                                                         x_interval = [X.max() -  X.min()])
 
-means_np = means_np.astype(np.float32)
-bandwidths_np = bandwidths_np.astype(np.float32)
+means_np = means_np.astype(np.float)
+bandwidths_np = bandwidths_np.astype(np.float64)
+
 
 print('means_np')
 print(means_np)
@@ -131,13 +133,15 @@ print(bandwidths_np.shape)
 #powers_np = np.ones(N_COMPONENTS, )
 
 # TODO -- why is this here?
-#powers_np = [np.float32(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
+#powers_np = [np.float64(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
+powers_np = [np.float64(np_float) for np_float in powers_np]
 
 print('powers_np')
 print(powers_np)
 
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
 ALPHA = 1e-3
+
 
 kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
     bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
@@ -199,7 +203,7 @@ print(tf.convert_to_tensor(kern.powers).numpy())
 #bandwidths_np = np.ones((1,N_COMPONENTS)) 
 #powers_np = np.ones(N_COMPONENTS, )
 
-#powers_np = [np.float32(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
+#powers_np = [np.float64(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
 
 
 # %% [markdown]
