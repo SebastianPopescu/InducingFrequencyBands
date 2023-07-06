@@ -184,8 +184,8 @@ N = 500 # Number of training observations
 X = rnd.rand(N, 1) * 2 - 1 # X values
 Y = func(X) + 0.2 * rnd.randn(N, 1) # Noisy Y values
 
-X = X.astype(np.float64)
-Y = Y.astype(np.float64)
+X = X.astype(np.float32)
+Y = Y.astype(np.float32)
 
 plt.plot(X, Y, 'x', alpha=0.2)
 D = X.shape[1]
@@ -210,8 +210,8 @@ MAXITER = 100
 
 means_np, bandwidths_np, powers_np = np_disjoint_initial_components([10.], n_components=N_COMPONENTS, x_interval = [X.max() -  X.min()])
 
-means_np = means_np.astype(np.float64)
-bandwidths_np = bandwidths_np.astype(np.float64)
+means_np = means_np.astype(np.float32)
+bandwidths_np = bandwidths_np.astype(np.float32)
 
 print('means_np')
 print(means_np)
@@ -225,13 +225,13 @@ print(bandwidths_np.shape)
 #bandwidths_np = np.ones((1,N_COMPONENTS)) 
 #powers_np = np.ones(N_COMPONENTS, )
 
-powers_np = [np.float64(np_float) for np_float in powers_np]
+powers_np = [np.float32(np_float) for np_float in powers_np]
 print('powers_np')
 print(powers_np)
 
 
 kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
-    bandwidths= bandwidths_np, powers=powers_np)
+    bandwidths= bandwidths_np, powers=powers_np, alpha = 1e-3)
 #kern = gpflow.kernels.SummedSpectralBlock(powers = powers_np, means = means_np, bandwidths = bandwidths_np, SpectralComponent='Block')
 
 fig, ax = plt.subplots(1,1, figsize=(5, 2.5))
@@ -250,7 +250,6 @@ plt.close()
 #m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
 
 m = gpflow.models.GPR( data = (X, Y), kernel = kern)
-
 
 opt = gpflow.optimizers.Scipy()
 opt_logs = opt.minimize(

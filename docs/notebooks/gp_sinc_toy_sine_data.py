@@ -144,8 +144,8 @@ X = rnd.rand(N, 1) * 2 - 1 # X values
 Y = func(X) + 0.2 * rnd.randn(N, 1) # Noisy Y values
 
 
-X = X.astype(np.float64)
-Y = Y.astype(np.float64)
+X = X.astype(np.float32)
+Y = Y.astype(np.float32)
 
 
 plt.plot(X, Y, 'x', alpha=0.2)
@@ -176,12 +176,12 @@ bandwidths_np = np.ones((1,1))
 powers_np = [1.0]
 
 
-powers_np = [np.float64(np_float) for np_float in powers_np]
+powers_np = [np.float32(np_float) for np_float in powers_np]
 print('powers_np')
 print(powers_np)
 
 kern = gpflow.kernels.SpectralBlock(means= means_np, 
-    bandwidths= bandwidths_np, powers=powers_np)
+    bandwidths= bandwidths_np, powers=powers_np, alpha = 1e-3 )
 
 m = gpflow.models.GPR( data = (X, Y), kernel = kern)
 
