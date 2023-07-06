@@ -60,10 +60,6 @@ def Kuf_block_spectral_kernel_inducingpoints(
     _bandwidths = kernel.bandwidths # expected shape [D, M]
     _powers = kernel.powers # expected shape [M, ]
 
-    print('--- inside sine_term Kuf ---')
-    print(_bandwidths)
-    print(Xnew)
-
     sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]

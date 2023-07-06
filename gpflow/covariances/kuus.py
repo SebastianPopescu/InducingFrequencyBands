@@ -63,15 +63,9 @@ def midpoint_rule(x, std, a, b, n):
 
 def burmann_series_approx_erf(x, mean, std):
 
-    print('---burmann series----')
-    print(x)
-    print(mean)
-    print(std)
-    print(tf.math.sqrt(2.))
-
-
     #\operatorname{erf}\left( \frac{w_{1}-w'}{\sqrt{\frac{2\alpha}{\pi^{2}}}} \right) 
-    res = burmann_series_second_order_approx((x-mean)/(tf.math.sqrt(2.)*std))
+    res = burmann_series_second_order_approx((x-mean)/(tf.cast(tf.math.sqrt(2.),
+                                                               default_float())*std))
 
     return res
 
@@ -83,7 +77,7 @@ def burmann_series_second_order_approx(x):
     #\left[ \frac{\sqrt{\pi}}{2} + \frac{31}{200}\exp{-x^{2}} 
     #- \frac{341}{8000}\exp{-2x^{2}}\right]   
 
-    res = 2./tf.sqrt(np.pi) * tf.math.sign(x) * tf.sqrt(1 - tf.math.exp(-x**2)) 
+    res = tf.cast(2./tf.sqrt(np.pi), default_float()) * tf.math.sign(x) * tf.cast(tf.sqrt(1. - tf.math.exp(-x**2)), default_float())
     res *= (np.pi/2. + 31./200. * tf.math.exp(-x**2) - 341./8000. * tf.math.exp(-2.*x**2))
     return res
 

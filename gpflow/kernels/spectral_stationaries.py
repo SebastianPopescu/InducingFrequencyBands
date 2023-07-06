@@ -361,21 +361,18 @@ class SpectralStationary(SpectralKernel):
             powers,
             transform=Exp(),  # type: ignore
             name="powers",
-            dtype=tf.float32,
         )
 
         self.means = Parameter(
             means,
             transform=Exp(),  # type: ignore
             name="means",
-            dtype=tf.float32,
         )
 
         self.bandwidths = Parameter(
             bandwidths,
             transform=Exp(),  # type: ignore
             name="bandwidths",
-            dtype=tf.float32,
         )
         self._validate_ard_active_dims(self.means)
 
