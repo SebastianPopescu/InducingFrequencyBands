@@ -182,11 +182,12 @@ print('--------------------------')
 print('trainable variables after deactivation')
 print(m.trainable_variables)
 
-opt = gpflow.optimizers.Scipy()
-#opt = tf.optimizers.Adam()
-
-opt_logs = opt.minimize(m.training_loss, m.trainable_variables, 
-                        options=dict(maxiter=100))
+opt_logs = gpflow.optimizers.Scipy().minimize(
+    m.training_loss,
+    variables=m.trainable_variables,
+    method="l-bfgs-b",
+    options={"disp": True, "maxiter": MAXITER},
+)
 
 
 print('---- After training -----')
