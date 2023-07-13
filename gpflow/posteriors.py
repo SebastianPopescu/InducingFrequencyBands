@@ -450,7 +450,7 @@ class SGPRPosterior(AbstractPosterior):
     models to compute faster predictions on unseen points.
     """
 
-    #NOTE -- this is temporarily deactivated due to some conflicts with Spectral Inducing Points
+    #FIXME -- currently throws errors during training 
     #@check_shapes(
     #    "data[0]: [N, D]",
     #    "data[1]: [N, Q]",
