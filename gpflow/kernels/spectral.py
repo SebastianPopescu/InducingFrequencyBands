@@ -167,10 +167,6 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
         
         :return: expected shape [N, D, M]
         """
-    
-        print('--- inside scale ---')
-        print(X)
-        print(self.means)
 
         X_scaled = tf.expand_dims(X, axis =-1) * tf.expand_dims(self.means, axis = 0)
 

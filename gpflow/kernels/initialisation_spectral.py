@@ -22,7 +22,7 @@ from pio_autogp.kernels.minecraft.transition import (
 LOG = pio_logging.logger(__name__)
 
 
-#TODO -- need to see what I can do with this
+#TODO -- this is taken from Fergus, not sure we need it for this project
 
 
 @tf.function

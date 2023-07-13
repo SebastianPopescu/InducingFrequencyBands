@@ -40,6 +40,10 @@ def Kuu_block_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, *, jitter: float = 0.0
 ) -> tf.Tensor:
     
+    """
+    To be used for example for GP-Sinc or GP-MultiSpectralKernel.
+    """
+    
     Kzz = kernel(inducing_variable.Z)
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
@@ -53,8 +57,13 @@ def midpoint_rule(x, std, a, b, n):
     mean_midpoints = tf.linspace(a + h/2, b - h/2, n)
     
     # Evaluate the function at the midpoint values
-    f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
-    
+
+    #NOTE -- this is usign the Burmann series second order approximation
+    #f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
+    #NOTE -- this is using the default Tensorflow version
+    f_midpoints = tf.math.erf((x-mean_midpoints)/(tf.cast(tf.math.sqrt(2.),
+                                                               default_float())*std))
+
     # Calculate the approximate integral using the midpoint rule formula
     integral_approx = h * tf.reduce_sum(f_midpoints)
     
@@ -72,17 +81,23 @@ def burmann_series_approx_erf(x, mean, std):
 
 def burmann_series_second_order_approx(x):
 
-    #\operatorname{erf}\left( x \right) \approx \frac{2}{\sqrt{\pi}}
-    #\operatorname{sgn}\left( x \right) \sqrt{1 - \exp{-x^{2}}} 
-    #\left[ \frac{\sqrt{\pi}}{2} + \frac{31}{200}\exp{-x^{2}} 
-    #- \frac{341}{8000}\exp{-2x^{2}}\right]   
+    """
+    Implements a Burmann Series approximation of order 2 to the ERF function
+    
+    Latex math code:
+
+    \operatorname{erf}\left( x \right) \approx \frac{2}{\sqrt{\pi}}
+    \operatorname{sgn}\left( x \right) \sqrt{1 - \exp{-x^{2}}} 
+    \left[ \frac{\sqrt{\pi}}{2} + \frac{31}{200}\exp{-x^{2}} 
+    - \frac{341}{8000}\exp{-2x^{2}}\right]   
+    """
 
     res = tf.cast(2./tf.sqrt(np.pi), default_float()) * tf.math.sign(x) * tf.cast(tf.sqrt(1. - tf.math.exp(-x**2)), default_float())
     res *= (np.pi/2. + 31./200. * tf.math.exp(-x**2) - 341./8000. * tf.math.exp(-2.*x**2))
     return res
 
 @Kuu.register(SpectralInducingVariables, MultipleSpectralBlock)
-def Kuu_block_spectral_kernel_inducingpoints(
+def Kuu_block_multi_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
 ) -> tf.Tensor:
     
@@ -92,25 +107,34 @@ def Kuu_block_spectral_kernel_inducingpoints(
 
     #NOTE -- implements the following integral but approximated numerically
     #NOTE -- erf is implemented via the second order Burmann series approximation
+    #TODO -- do I need  to use tf.stop_gradients here?
 
-    num_approx_N = 100
+    num_approx_N = 1000
 
     Kzz = tf.linalg.diag(kernel.powers / (2. * kernel.bandwidths))
 
     lower_limit = kernel.means - 0.5 * kernel.bandwidths
     upper_limit = kernel.means + 0.5 * kernel.bandwidths
     
-    num_int_approx = midpoint_rule(upper_limit, std = kernel.alpha / np.pi**2, 
+    num_int_approx = midpoint_rule(upper_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
+                                                              , default_float()) / 
+                                   tf.cast(np.pi, default_float()), 
                                    a = lower_limit, b = upper_limit, n = num_approx_N)
     
-    num_int_approx -= midpoint_rule(lower_limit, std = kernel.alpha / np.pi**2, 
+    num_int_approx -= midpoint_rule(lower_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
+                                                               , default_float()) / 
+                                    tf.cast(np.pi,default_float()), 
                                    a = lower_limit, b = upper_limit, n = num_approx_N)
     
     Kzz *= tf.linalg.diag(num_int_approx)
 
-    #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
-    return tf.squeeze(2. * Kzz,axis=0)
+    print('--- inside Kzz ----')
+    print(Kzz)
 
+    #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
+    return tf.squeeze(2. * Kzz, axis=0)
+
+    
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(
     "inducing_variable: [M, D, 1]",
