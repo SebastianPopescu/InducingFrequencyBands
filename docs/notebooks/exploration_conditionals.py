@@ -261,5 +261,4 @@ def plot_kernel(
     plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_exploration.png')
     plt.close()
 
-
 plot_kernel(kern)

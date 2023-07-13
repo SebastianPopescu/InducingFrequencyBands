@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # Inducing Frequency Bands with Local Spectrum -- limit alpha to 0 case.
+# # GP-MultiSinc.
 
 # %%
 # %matplotlib inline
