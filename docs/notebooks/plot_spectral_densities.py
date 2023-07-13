@@ -8,7 +8,6 @@ import tensorflow as tf
 import gpflow
 from gpflow.ci_utils import reduce_in_tests
 
-
 from gpflow.init import (rbf_spectral_density,
     matern_1_2_spectral_density,
     matern_3_2_spectral_density, 
@@ -21,7 +20,6 @@ MAXFREQ=10.
 N_COMPONENTS = 1
 MAXITER = 1000
 EXPERIMENT_NAME = 'rbf_spectral_density'
-
 
 fig, ax = plt.subplots(1,1, figsize=(5, 2.5))
 
