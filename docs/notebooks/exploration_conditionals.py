@@ -14,7 +14,11 @@
 # ---
 
 # %% [markdown]
-# # Inducing Frequency Bands with Local Spectrum -- limit alpha to 0 case.
+# # This notebook explores function samples from certain spectral kernels 
+# # (symmetrical rectangular blocks that are either initialized to be similar
+# # to an RBF kernel, periodogram of data or just constant energy for each bandwidth).
+# # We plot the conditional function (either based on some data for GPR model, or based
+# # on inducing points for SGPR). 
 
 # %%
 # %matplotlib inline
@@ -60,12 +64,16 @@ N = 100  # Number of training observations
 X_cond = np.linspace(0, 1.0, N)  # X values
 Y_cond = func(X_cond) + 0.2 * rng.randn(N, )  # Noisy Y values
 
+# %% [markdown]
+# # Can choose between 'GPR' and 'SGPR'
 MODEL = 'SGPR'
 KERNEL = 'multisinc'
 MAXFREQ = 10.
 N_COMPONENTS = 50
 MAXITER = 1000
 
+# %% [markdown]
+# # Can choose between 'rbf', 'Periodogram' or 'Neutral'
 INIT_METHOD = 'rbf'
 #INIT_METHOD = 'Periodogram' 
 #INIT_METHOD ='Neutral'
@@ -187,9 +195,12 @@ def plot_kernel_prediction(
         Xplot[:, 0], f_lower[:, 0], f_upper[:, 0], color=color, alpha=0.1
     )
     ax.set_ylim(bottom=-2.5, top=2.5)
-    ax.set_title("Example data fit")
-
-
+    if MODEL=='SGPR' and parametric:
+        ax.set_title("Example parametric data fit")
+    elif MODEL=='SGPR' and not parametric:
+        ax.set_title("Example non-parametric data fit")
+    elif MODEL=='GPR':
+        ax.set_title("Example data fit")
 
 def spectral_basis(x, mean, bandwidth, variance, use_blocks=True):
     if use_blocks:
