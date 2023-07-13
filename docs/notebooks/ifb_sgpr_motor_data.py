@@ -46,10 +46,8 @@ tf.random.set_seed(42)
 
 # %% [markdown]
 # ## Generating data
-# For this notebook example, we use the Snelson dataset.
+# For this notebook example, we use the Motor dataset.
 
-# %%
-# %%
 def motorcycle_data():
     """
     The motorcycle dataset where the targets are normalised to zero mean and unit variance.
@@ -103,6 +101,8 @@ print('nyguist frequency')
 print(NYQUIST_FREQ)
 print('**********************')
 
+MODEL = 'ifb_sgpr'
+EXPERIMENT = 'motor_data'
 MAXFREQ = 2.
 assert MAXFREQ < NYQUIST_FREQ, "MAXFREQ has to be lower than the Nyquist frequency"
 N_COMPONENTS = 50
@@ -178,7 +178,7 @@ spectral_block_1a = rbf_spectral_density(np.linspace(0, MAXFREQ, 1000)
 ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), 
         label='RBF spectral density', linewidth=.8)
 
-plt.savefig('./figures/IFB_sgpr_sym_rectangles_init_motor_data.png')
+plt.savefig(f'./figures/{MODEL}_sym_rectangles_init_{EXPERIMENT}.png')
 plt.close()
 
 ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
@@ -248,7 +248,7 @@ def plot(title=""):
     plt.legend(loc="lower right")
 
 plot("Predictions after training")
-plt.savefig('./figures/IFB_sgpr_pred_motor_data.png')
+plt.savefig(f'./figures/{MODEL}_pred_{EXPERIMENT}.png')
 plt.close()
 
 def plot_samples(title=""):
@@ -282,7 +282,7 @@ def plot_samples(title=""):
     plt.legend(loc="lower right")
 
 plot_samples("Sample Predictions after training")
-plt.savefig('./figures/IFB_sgpr_samples_motor_data.png')
+plt.savefig(f'./figures/{MODEL}_samples_{EXPERIMENT}.png')
 plt.close()
 
 # Periodogram and optimized symmetrical rectangles
@@ -302,5 +302,5 @@ for _ in range(N_COMPONENTS):
             linewidth=.8)
 EXPERIMENT_NAME = '...'
 
-plt.savefig('./figures/IFB_sgpr_motor_data_periodogram.png')
+plt.savefig(f'./figures/{MODEL}_{EXPERIMENT}_periodogram.png')
 plt.close()

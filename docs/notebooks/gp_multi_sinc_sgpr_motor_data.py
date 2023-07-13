@@ -21,6 +21,8 @@
 import itertools
 import time
 
+import pandas as pd
+from sklearn.cluster import KMeans
 import numpy.random as rnd
 
 import matplotlib.pyplot as plt
@@ -46,34 +48,30 @@ tf.random.set_seed(42)
 
 # %% [markdown]
 # ## Generating data
-# For this notebook example, we generate 10,000 noisy observations from a test function:
-# \begin{equation}
-#   f(x) = \sin(3\pi x) + 0.3\cos(9\pi x) + \frac{\sin(7 \pi x)}{2}
-# \end{equation}
+# For this notebook example, we use the Motor dataset.
 
-# %%
-def func(x):
-    return (
-        np.sin(x * 3 * 3.14)
-        + 0.3 * np.cos(x * 9 * 3.14)
-        + 0.5 * np.sin(x * 7 * 3.14)
-    )
+def motorcycle_data():
+    """
+    The motorcycle dataset where the targets are normalised to zero mean and unit variance.
+    Returns a tuple of input features with shape [N, 1] and corresponding targets with shape [N, 1].
+    """
+    df = pd.read_csv("./data/motor.csv", index_col=0)
+    X, Y = df["times"].values.reshape(-1, 1), df["accel"].values.reshape(-1, 1)
+    Y = (Y - Y.mean()) / Y.std()
+    return X, Y
 
 
-N = 10000  # Number of training observations
-
-X = np.linspace(0, 5, N)  # X values
-Y = func(X) + 0.2 * rng.randn(N, )  # Noisy Y values
+X, Y = motorcycle_data()
+plt.plot(X, Y, "kx")
+plt.xlabel("time")
+plt.ylabel("Acceleration")
+plt.savefig("./figures/motor.png")
+plt.close()
+#X = tf.convert_to_tensor(X, dtype=tf.float64)
+#Y = tf.convert_to_tensor(Y, dtype=tf.float64)
+X = X.astype(np.float64)
+Y = Y.astype(np.float64)
 data = (X, Y)
-
-# %% [markdown]
-# We plot the data along with the noiseless generating function:
-
-# %%
-plt.plot(X, Y, "x", alpha=0.2)
-Xt = np.linspace(0, 5.0, 1000)[:, None]
-Yt = func(Xt)
-_ = plt.plot(Xt, Yt, c="k")
 
 
 def spectral_basis(x, mean, bandwidth, variance, use_blocks=True):
@@ -106,17 +104,16 @@ print('nyguist frequency')
 print(NYQUIST_FREQ)
 print('**********************')
 
-
-MODEL = 'ifb_sgpr'
+MODEL = 'gp_multi_sinc_sgpr'
 EXPERIMENT = 'motor_data'
-MAXFREQ = 10.
+MAXFREQ = 2.
 assert MAXFREQ < NYQUIST_FREQ, "MAXFREQ has to be lower than the Nyquist frequency"
 N_COMPONENTS = 50
-MAXITER = 1000
+MAXITER = 100
 
 #INIT_METHOD = 'rbf'
-INIT_METHOD = 'Periodogram' 
-#INIT_METHOD ='Neutral'
+#INIT_METHOD = 'Periodogram' 
+INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
 ALPHA = 1e-12
@@ -151,7 +148,6 @@ elif INIT_METHOD == 'rbf':
 means_np = means_np.astype(np.float)
 bandwidths_np = bandwidths_np.astype(np.float64)
 
-
 print('means_np')
 print(means_np)
 print(means_np.shape)
@@ -160,10 +156,6 @@ print('bandwidths_np')
 print(bandwidths_np)
 print(bandwidths_np.shape)
 
-
-#powers_np = np.ones(N_COMPONENTS, )
-
-# TODO -- why is this here?
 #powers_np = [np.float64(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
 powers_np = [np.float64(np_float) for np_float in powers_np]
 
@@ -191,11 +183,13 @@ ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(),
 plt.savefig(f'./figures/{MODEL}_sym_rectangles_init_{EXPERIMENT}.png')
 plt.close()
 
-ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
+
+km = KMeans(n_clusters=N_COMPONENTS).fit(X.reshape((-1,1)))
+Z = km.cluster_centers_
+ind_var = gpflow.inducing_variables.InducingPoints(Z = Z)
 
 print('-------- Inducing Variables --------')
 print(ind_var)
-
 
 #m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
 m = gpflow.models.SGPR((X.reshape((-1,1)), Y.reshape((-1,1))), kern, ind_var)
@@ -233,7 +227,7 @@ print(tf.convert_to_tensor(kern.powers).numpy())
 def plot(title=""):
     plt.figure(figsize=(12, 4))
     plt.title(title)
-    pX = np.linspace(-2.0, 7.0, 1000)[:, None]  # Test locations
+    pX = np.linspace(-10.0, 55.0, 1000)[:, None]  # Test locations
     pY, pYv = m.predict_y(pX)  # Predict Y values at test locations
     plt.plot(X, Y, "x", label="Training points", alpha=0.2)
     (line,) = plt.plot(pX, pY, lw=1.5, label="Mean of predictive posterior")
@@ -256,7 +250,7 @@ plt.close()
 def plot_samples(title=""):
     plt.figure(figsize=(12, 4))
     plt.title(title)
-    pX = np.linspace(-2.0, 7.0, 1000)[:, None]  # Test locations
+    pX = np.linspace(-10.0, 55.0, 1000)[:, None]  # Test locations
     pY, pYv = m.predict_y(pX)  # Predict Y values at test locations
     #TODO -- we need to take samples actually
     

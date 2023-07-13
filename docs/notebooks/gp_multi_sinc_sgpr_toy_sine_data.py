@@ -21,6 +21,7 @@
 import itertools
 import time
 
+from sklearn.cluster import KMeans
 import numpy.random as rnd
 
 import matplotlib.pyplot as plt
@@ -106,17 +107,16 @@ print('nyguist frequency')
 print(NYQUIST_FREQ)
 print('**********************')
 
-
-MODEL = 'ifb_sgpr'
+MODEL = 'gp_multi_sinc_sgpr'
 EXPERIMENT = 'motor_data'
 MAXFREQ = 10.
 assert MAXFREQ < NYQUIST_FREQ, "MAXFREQ has to be lower than the Nyquist frequency"
 N_COMPONENTS = 50
-MAXITER = 1000
+MAXITER = 100
 
 #INIT_METHOD = 'rbf'
-INIT_METHOD = 'Periodogram' 
-#INIT_METHOD ='Neutral'
+#INIT_METHOD = 'Periodogram' 
+INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
 ALPHA = 1e-12
@@ -151,7 +151,6 @@ elif INIT_METHOD == 'rbf':
 means_np = means_np.astype(np.float)
 bandwidths_np = bandwidths_np.astype(np.float64)
 
-
 print('means_np')
 print(means_np)
 print(means_np.shape)
@@ -160,10 +159,6 @@ print('bandwidths_np')
 print(bandwidths_np)
 print(bandwidths_np.shape)
 
-
-#powers_np = np.ones(N_COMPONENTS, )
-
-# TODO -- why is this here?
 #powers_np = [np.float64(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
 powers_np = [np.float64(np_float) for np_float in powers_np]
 
@@ -191,11 +186,13 @@ ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(),
 plt.savefig(f'./figures/{MODEL}_sym_rectangles_init_{EXPERIMENT}.png')
 plt.close()
 
-ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
+
+km = KMeans(n_clusters=N_COMPONENTS).fit(X.reshape((-1,1)))
+Z = km.cluster_centers_
+ind_var = gpflow.inducing_variables.InducingPoints(Z = Z)
 
 print('-------- Inducing Variables --------')
 print(ind_var)
-
 
 #m = gpflow.models.SVGP(kern, gpflow.likelihoods.Gaussian(), ind_var)
 m = gpflow.models.SGPR((X.reshape((-1,1)), Y.reshape((-1,1))), kern, ind_var)
