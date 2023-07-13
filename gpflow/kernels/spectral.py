@@ -43,7 +43,8 @@ class SpectralBlock(AnisotropicSpectralStationary):
         :param bandwidths: The frequency range spanned by the spectral block.
         :param active_dims: TODO missing param description
         """
-        super().__init__(powers=powers, means=means, bandwidths=bandwidths, alpha = alpha, active_dims=active_dims)
+        super().__init__(powers=powers, means=means, bandwidths=bandwidths, 
+                         alpha = alpha, active_dims=active_dims)
 
     def K_d(self, d):
         """
@@ -147,7 +148,8 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
         :param active_dims: TODO missing param description
         """
 
-        super().__init__(powers = powers, means = means, bandwidths = bandwidths, alpha=alpha,**kwargs)
+        super().__init__(powers = powers, means = means, bandwidths = bandwidths, 
+                         alpha=alpha, **kwargs)
 
         self.n_components = n_components
 
@@ -236,36 +238,9 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
 
 
 
-#NOTE -- deprecated way of constructing multi-spectral blocks kernels. This will be slow due to for loop.
-'''
-def SummedSpectralBlock(powers, means, bandwidths, SpectralComponent='Block'):
-    """
-    amplitude_sqrt shape should be (M) 
-    lengthscales and mus should both be of shape (D, M) 
-    SpectralComponent is either 'Block' or 'Gauss'
-    """
-    if SpectralComponent == 'Block':
-        Basis_Kernel = SpectralBlock
-    else:
-        #Basis_Kernel = GaussSpectralKernel
-        pass
-
-    D,M = means.shape
-    #N = amplitude_sqrt.shape[-1]
-    kernel_list = []
-    for m in range(M):
-        
-        kernel = SpectralBlock(powers[m], means[:,m], bandwidths[:,m])
-        #K += kernel
-        kernel_list.append(kernel)
-    K = SpectralSum(kernel_list)
-
-    return K
-'''
-
-
 class SpectralGaussian(AnisotropicSpectralStationary):
-    """The primitive kernel whose spectral density is comprised of a pair of Gaussians."""
+    """The primitive kernel whose spectral density is comprised of a 
+    pair of symmetrical Gaussians."""
 
     def __init__(self, 
         powers, # stands for A -- expected shape [1, ]
@@ -301,7 +276,7 @@ class SpectralGaussian(AnisotropicSpectralStationary):
 
         return self.powers * cos_term * exponential_term
 
-
+#TODO -- this is sort of breaking the encapsulation in the dispatch methods in covariances
 def MixtureSpectralGaussian(
     n_components: int,
     means,
@@ -309,7 +284,7 @@ def MixtureSpectralGaussian(
     powers,
 ) -> Sum:
     """
-    A helper function to combine several block kernels.
+    A helper function to combine several spectral Gaussian kernels.
 
     :param n_components: How many blocks to combine.
     :param means: (Optional) The mean frequencies, of the dimensions ``DxN``, where ``N`` is

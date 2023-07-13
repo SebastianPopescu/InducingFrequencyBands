@@ -34,6 +34,19 @@ def Kuu_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
+@Kuu.register(InducingPoints, MultipleSpectralBlock)
+def Kuu_spectral_kernel_inducingpoints(
+    inducing_variable: InducingPoints, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
+) -> tf.Tensor:
+
+    """
+    To be used for SGPR or SVGP versions of GP-Sinc.
+    """
+
+    Kzz = kernel(inducing_variable.Z)
+    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
+
+    return Kzz
 
 @Kuu.register(SpectralInducingVariables, SpectralKernel)
 def Kuu_block_spectral_kernel_inducingpoints(

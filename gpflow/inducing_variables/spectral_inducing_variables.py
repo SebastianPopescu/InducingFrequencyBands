@@ -91,5 +91,13 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
 
 class RectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
     """
-    Real-space (in output space) "spectral" inducing points with a PSD given by symmetrical rectangles. Corresponding kernel is the sinc kernel.
+    Real-space (in output space) "spectral" inducing points with a PSD given by 
+    symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
     """
+
+class RectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
+    """
+    Real-space (in output space) "spectral" inducing points with a PSD given by 
+    symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
+    """
+

@@ -34,16 +34,19 @@ def Kuf_kernel_inducingpoints(
     return kernel(inducing_variable.Z, Xnew)
 
 
-@Kuf.register(SpectralInducingVariables, SpectralKernel, TensorLike)
+@Kuf.register(InducingPoints, MultipleSpectralBlock, TensorLike)
 @check_shapes(
     "inducing_variable: [M, D, 1]",
     "Xnew: [batch..., N, D]",
     "return: [M, batch..., N]",
 )
 def Kuf_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, Xnew: TensorType
+    inducing_variable: InducingPoints, kernel: MultipleSpectralBlock, Xnew: TensorType
 ) -> tf.Tensor:
-    return kernel(inducing_variable.Z, Xnew)
+    Kzf = kernel(inducing_variable.Z, Xnew)
+
+    return Kzf
+
 
 @Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
 #TODO -- re-introduce the check_shapes 
