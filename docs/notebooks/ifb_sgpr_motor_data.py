@@ -26,7 +26,7 @@ import numpy.random as rnd
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-
+import pandas as pd
 import tikzplotlib
 from scipy.stats import norm
 
@@ -46,35 +46,33 @@ tf.random.set_seed(42)
 
 # %% [markdown]
 # ## Generating data
-# For this notebook example, we generate 10,000 noisy observations from a test function:
-# \begin{equation}
-#   f(x) = \sin(3\pi x) + 0.3\cos(9\pi x) + \frac{\sin(7 \pi x)}{2}
-# \end{equation}
+# For this notebook example, we use the Snelson dataset.
 
 # %%
-def func(x):
-    return (
-        np.sin(x * 3 * 3.14)
-        + 0.3 * np.cos(x * 9 * 3.14)
-        + 0.5 * np.sin(x * 7 * 3.14)
-    )
+# %%
+def motorcycle_data():
+    """
+    The motorcycle dataset where the targets are normalised to zero mean and unit variance.
+    Returns a tuple of input features with shape [N, 1] and corresponding targets with shape [N, 1].
+    """
+    df = pd.read_csv("./data/motor.csv", index_col=0)
+    X, Y = df["times"].values.reshape(-1, 1), df["accel"].values.reshape(-1, 1)
+    Y = (Y - Y.mean()) / Y.std()
+    return X, Y
 
 
-N = 10000  # Number of training observations
+X, Y = motorcycle_data()
+plt.plot(X, Y, "kx")
+plt.xlabel("time")
+plt.ylabel("Acceleration")
+plt.savefig("./figures/motor.png")
+plt.close()
 
-X = np.linspace(0, 5, N)  # X values
-Y = func(X) + 0.2 * rng.randn(N, )  # Noisy Y values
+#X = tf.convert_to_tensor(X, dtype=tf.float64)
+#Y = tf.convert_to_tensor(Y, dtype=tf.float64)
+X = X.astype(np.float64)
+Y = Y.astype(np.float64)
 data = (X, Y)
-
-# %% [markdown]
-# We plot the data along with the noiseless generating function:
-
-# %%
-plt.plot(X, Y, "x", alpha=0.2)
-Xt = np.linspace(0, 5.0, 1000)[:, None]
-Yt = func(Xt)
-_ = plt.plot(Xt, Yt, c="k")
-
 
 def spectral_basis(x, mean, bandwidth, variance, use_blocks=True):
     if use_blocks:
@@ -90,8 +88,7 @@ def make_component_spectrum(x, mean, bandwidth, variance, use_blocks=True):
     
     return spectrum
 
-X = X.astype(np.float64)
-Y = Y.astype(np.float64)
+
 Y = Y.ravel()
 
 print('shape of data')
@@ -106,44 +103,41 @@ print('nyguist frequency')
 print(NYQUIST_FREQ)
 print('**********************')
 
-MAXFREQ = 10.
+MAXFREQ = 2.
 assert MAXFREQ < NYQUIST_FREQ, "MAXFREQ has to be lower than the Nyquist frequency"
 N_COMPONENTS = 50
 MAXITER = 1000
 
 #INIT_METHOD = 'rbf'
-INIT_METHOD = 'Periodogram' 
-#INIT_METHOD ='Neutral'
-DELTAS = 1e-1
+INIT_METHOD = 'Periodogram'
+#INIT_METHOD = 'Neutral'
+DELTAS = 1e-3 #NOTE -- this doesn't  matter
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
 ALPHA = 1e-12
 
 if INIT_METHOD == 'Periodogram':
 
-    means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(
-        X.reshape((-1,1)), 
-        Y.ravel(), 
-        [MAXFREQ], 
-        n_components=N_COMPONENTS, 
-        x_interval = [X.max() -  X.min()]
-        )
+    means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(X.reshape((-1,1)), 
+                                                                                            Y.ravel(), 
+                                                                                            [MAXFREQ], 
+                                                                                            n_components=N_COMPONENTS, 
+                                                                                            x_interval = [X.max() -  X.min()])
 elif INIT_METHOD == 'Neutral':
 
-    means_np, bandwidths_np, powers_np = neutral_initial_components(
-        X.reshape((-1,1)), 
-        Y.ravel(), 
-        [MAXFREQ], 
-        n_components=N_COMPONENTS,
-        x_interval = [X.max() -  X.min()],
-        deltas = DELTAS,                                                                   
-        )
+    means_np, bandwidths_np, powers_np = neutral_initial_components(X.reshape((-1,1)), 
+                                                                    Y.ravel(), 
+                                                                    [MAXFREQ], 
+                                                                    n_components=N_COMPONENTS,
+                                                                    x_interval = [X.max() -  X.min()],
+                                                                    deltas = DELTAS,                                                                   
+                                                                    )
 elif INIT_METHOD == 'rbf':
-    
     means_np, bandwidths_np, powers_np = riemann_approximate_rbf_initial_components(
         [MAXFREQ], 
         n_components=N_COMPONENTS, 
         x_interval = [X.max() -  X.min()]
         )
+
 
 means_np = means_np.astype(np.float)
 bandwidths_np = bandwidths_np.astype(np.float64)
@@ -170,8 +164,7 @@ print(powers_np)
 kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
     bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
 
-fig, ax = plt.subplots(1, 1, 
-                       figsize=(5, 2.5))
+fig, ax = plt.subplots(1,1, figsize=(5, 2.5))
 
 for _ in range(N_COMPONENTS):
     spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
@@ -185,7 +178,7 @@ spectral_block_1a = rbf_spectral_density(np.linspace(0, MAXFREQ, 1000)
 ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), 
         label='RBF spectral density', linewidth=.8)
 
-plt.savefig('./figures/IFB_sgpr_sym_rectangles_init_toy_data.png')
+plt.savefig('./figures/IFB_sgpr_sym_rectangles_init_motor_data.png')
 plt.close()
 
 ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
@@ -202,7 +195,7 @@ print('trainable variables at the beginning')
 print(m.trainable_variables)
 gpflow.utilities.set_trainable(m.kernel.bandwidths, False)
 gpflow.utilities.set_trainable(m.kernel.means, False)
-#gpflow.utilities.set_trainable(m.kernel.powers, False)
+gpflow.utilities.set_trainable(m.kernel.powers, False)
 print('--------------------------')
 print('trainable variables after deactivation')
 print(m.trainable_variables)
@@ -214,6 +207,7 @@ opt_logs = gpflow.optimizers.Scipy().minimize(
     options={"disp": True, "maxiter": MAXITER},
 )
 
+
 print('---- After training -----')
 print('means_np')
 print(tf.convert_to_tensor(kern.means).numpy())
@@ -224,13 +218,20 @@ print(tf.convert_to_tensor(kern.bandwidths).numpy())
 print('powers_np')
 print(tf.convert_to_tensor(kern.powers).numpy())
 
+#means_np = np.ones((1,N_COMPONENTS)) 
+#bandwidths_np = np.ones((1,N_COMPONENTS)) 
+#powers_np = np.ones(N_COMPONENTS, )
+
+#powers_np = [np.float64(np_float) * bandwidths_np[:,_][0] * 2. for _, np_float in enumerate(powers_np)]
+
+
 # %% [markdown]
 # Finally, we plot the model's predictions.
 
 def plot(title=""):
     plt.figure(figsize=(12, 4))
     plt.title(title)
-    pX = np.linspace(-2.0, 7.0, 1000)[:, None]  # Test locations
+    pX = np.linspace(-10.0, 55.0, 1000)[:, None]  # Test locations
     pY, pYv = m.predict_y(pX)  # Predict Y values at test locations
     plt.plot(X, Y, "x", label="Training points", alpha=0.2)
     (line,) = plt.plot(pX, pY, lw=1.5, label="Mean of predictive posterior")
@@ -247,13 +248,13 @@ def plot(title=""):
     plt.legend(loc="lower right")
 
 plot("Predictions after training")
-plt.savefig('./figures/IFB_sgpr_pred_toy_data.png')
+plt.savefig('./figures/IFB_sgpr_pred_motor_data.png')
 plt.close()
 
 def plot_samples(title=""):
     plt.figure(figsize=(12, 4))
     plt.title(title)
-    pX = np.linspace(-2.0, 7.0, 1000)[:, None]  # Test locations
+    pX = np.linspace(-10.0, 55.0, 1000)[:, None]  # Test locations
     pY, pYv = m.predict_y(pX)  # Predict Y values at test locations
     #TODO -- we need to take samples actually
     
@@ -281,20 +282,15 @@ def plot_samples(title=""):
     plt.legend(loc="lower right")
 
 plot_samples("Sample Predictions after training")
-plt.savefig('./figures/IFB_sgpr_samples_toy_data.png')
+plt.savefig('./figures/IFB_sgpr_samples_motor_data.png')
 plt.close()
 
 # Periodogram and optimized symmetrical rectangles
 
-MAXFREQ=15.
+MAXFREQ=2.
 ax = data_object.plot_spectrum(maxfreq=MAXFREQ)
 
 for _ in range(N_COMPONENTS):
-    #spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
-    #                                            means_np[:,_], bandwidths_np[:,_], 
-    #                                            powers_np[_], use_blocks = True)
-    #ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), 
-    #        label='$S_{aa}(\\nu)$', linewidth=.8)
 
     spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
         tf.convert_to_tensor(kern.means[:,_]).numpy(), 
@@ -302,9 +298,9 @@ for _ in range(N_COMPONENTS):
         tf.convert_to_tensor(kern.powers[_]).numpy(), 
         use_blocks = True)
 
-    ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SymBand_'+str(_), 
+    ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SB_'+str(_), 
             linewidth=.8)
-EXPERIMENT_NAME = '....'
+EXPERIMENT_NAME = '...'
 
-plt.savefig('./figures/IFB_sgpr_toy_data_periodogram.png')
+plt.savefig('./figures/IFB_sgpr_motor_data_periodogram.png')
 plt.close()
