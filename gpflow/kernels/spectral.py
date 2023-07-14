@@ -14,7 +14,7 @@ from gpflow.kernels.base import Sum
 from gpflow.kernels.spectral_utils import sinc
 from gpflow.base import Parameter, TensorType
 from .spectral_utils import sinc
-
+from gpflow.config import default_float
 from ..utilities.ops import difference_matrix, square_distance, batched_difference_matrix
 
 
@@ -119,9 +119,11 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
     """
     
     The primitive kernel defined by multiple constant spectral density spanning finite bandwidths.
-    To be used for Inducing Frequency Bands models and gp-multiSinc.
+    To be used for Inducing Frequency Bands models and GP-MultiSinc.
     Works with multi-dimensional data by taking a product over symmetrical rectangles for each input dimension.
 
+    #NOTE -- in this scenario, for Inducing Frequency Bands it computes the ``global'' kernel.
+    For using GP-MultiSinc, one needs to set self.alpha = 0.
     """
 
     def __init__(
@@ -203,8 +205,8 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
 
 
     def K_d(self, d):
+        
         """
-
         :param d: expected_shape [M, N1, N2, D]
        
         Implements anisotropic version of MultiSinc kernel 
@@ -216,12 +218,23 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
              σ2 - magnitude
              ∆ - bandwidth
              ξ - frequency
-        Remainder: because of scale function, in our implementation d is already multipled by frequency/means             
+
+        #NOTE -- in this specific scenario, the ``local'' kernel is given by the 
+        multi-sinc kernel. To compute the ``global'' version, we implement
+        a naive form of deconvolution (i.e., Fourier quotient method) given
+        the lack of addive noise in the original convolution process.
+        We downscale the original multi-sinc kernel by the following:
+             \begin{equation}
+                K(\tau) = \frac{K_{c}(\tau)}
+                            {\frac{1}{4\pi} e^{-\frac{(\alpha \tau)^2}{2\alpha}}}
+            \end{equation}    
+        Remainder: because of scale function, in our implementation d 
+        is already multipled by frequency/means.             
 
         returns: expected_shape [N1,N2]
         """
 
-        #TODO -- shouldn't this be a reduce_prod last dim outside tf.cos???
+        # -- shouldn't this be a reduce_prod last dim outside tf.cos???
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) #[M, N1, N2]
     
         pre_multiplier = tf.transpose(self.bandwidths / self.means) # [M, D]
@@ -234,7 +247,18 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
 
         output = self.powers[:,None, None] * cos_term * sinc_term
     
-        return tf.reduce_sum(output, axis = 0)
+
+        # d : [M, N1, N2, D]
+        # {\frac{1}{4\pi} e^{-\frac{(\alpha \tau)^2}{2\alpha}}}
+        #FIXME -- need to be careful how to extend this to multi-dimensional case
+        if self.alpha>0:
+            conv_to_global = 4. * tf.cast(np.pi, default_float())
+            conv_to_global *= tf.math.reciprocal(tf.reduce_sum(tf.math.exp(- (self.alpha * d)**2 /
+                                                            (2.* self.alpha)), axis = -1))
+
+            return tf.reduce_sum(output, axis = 0) * tf.reduce_sum(conv_to_global, axis = 0)
+        else:
+            return tf.reduce_sum(output, axis = 0)
 
 
 
