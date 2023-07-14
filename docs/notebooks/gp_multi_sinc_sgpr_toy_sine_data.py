@@ -119,7 +119,7 @@ MAXITER = 100
 INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-12
+ALPHA = 0.
 
 if INIT_METHOD == 'Periodogram':
 
