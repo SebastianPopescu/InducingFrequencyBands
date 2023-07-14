@@ -61,7 +61,7 @@ def Kuu_block_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-def midpoint_rule(x, std, a, b, n):
+def midpoint_rule(x, std, a, b, n, Burmann_series):
 
     # Calculate the width of each subinterval
     h = (b - a) / n
@@ -71,10 +71,13 @@ def midpoint_rule(x, std, a, b, n):
     
     # Evaluate the function at the midpoint values
 
-    #NOTE -- this is usign the Burmann series second order approximation
-    #f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
-    #NOTE -- this is using the default Tensorflow version
-    f_midpoints = tf.math.erf((x-mean_midpoints)/(tf.cast(tf.math.sqrt(2.),
+
+    if Burmann_series:
+        #NOTE -- this is usign the Burmann series second order approximation
+        f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
+    else:
+        #NOTE -- this is using the default Tensorflow version
+        f_midpoints = tf.math.erf((x-mean_midpoints)/(tf.cast(tf.math.sqrt(2.),
                                                                default_float())*std))
 
     # Calculate the approximate integral using the midpoint rule formula
@@ -132,17 +135,17 @@ def Kuu_block_multi_spectral_kernel_inducingpoints(
     num_int_approx = midpoint_rule(upper_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
                                                               , default_float()) / 
                                    tf.cast(np.pi, default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N)
+                                   a = lower_limit, b = upper_limit, n = num_approx_N,
+                                   Burmann_series=False)
     
     num_int_approx -= midpoint_rule(lower_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
                                                                , default_float()) / 
                                     tf.cast(np.pi,default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N)
+                                   a = lower_limit, b = upper_limit, n = num_approx_N,
+                                   Burmann_series=False)
     
     Kzz *= tf.linalg.diag(num_int_approx)
 
-    print('--- inside Kzz ----')
-    print(Kzz)
 
     #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
     return tf.squeeze(2. * Kzz, axis=0)

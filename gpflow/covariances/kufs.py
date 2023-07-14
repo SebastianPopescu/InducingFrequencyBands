@@ -63,27 +63,19 @@ def Kuf_block_spectral_kernel_inducingpoints(
     _bandwidths = kernel.bandwidths # expected shape [D, M]
     _powers = kernel.powers # expected shape [M, ]
 
-    print('--- inside Kuf ----')
     sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
-    print(sine_term)
     
     cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
-    print(cosine_term)
 
     pre_multiplier = 2. * _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
-    print(pre_multiplier)
 
     Kzf  = pre_multiplier[..., None] * sine_term * cosine_term # expected shape (M, N)
-
-    #tf.debugging.assert_non_negative(
-    #    x  = Kzf, message='Kuf has negative terms', summarize=None, name=None
-    #)
 
     return Kzf
 

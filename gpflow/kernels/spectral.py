@@ -89,6 +89,7 @@ class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
         powers, 
         means,
         bandwidths,
+        alpha,
         active_dims=None,
     ):
         """
@@ -97,7 +98,8 @@ class SpectralDiracDeltaBlock(AnisotropicSpectralStationary):
         :param bandwidths: The frequency range spanned by the spectral block.
         :param active_dims: TODO missing param description
         """
-        super().__init__(powers=powers, means=means, bandwidths=bandwidths, active_dims=active_dims)
+        super().__init__(powers=powers, means=means, bandwidths=bandwidths, 
+                         active_dims=active_dims, alpha=alpha)
 
     def K_d(self, d):
         """
