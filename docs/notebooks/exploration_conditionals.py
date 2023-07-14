@@ -67,9 +67,15 @@ Y_cond = func(X_cond) + 0.2 * rng.randn(N, )  # Noisy Y values
 # %% [markdown]
 # # Can choose between 'GPR' and 'SGPR'
 MODEL = 'SGPR'
-KERNEL = 'multisinc'
+# %% [markdown]
+# # Can choose between 'multisinc' (i.e., corresponds to symmetrical rectangular blocks for both
+# # Inducing Frequency Bands and GP-MultiSinc) and 'cosine' (i.e., dirac delta functions in the kernel spectrum)
+KERNEL = 'multisinc' #'cosine'
 MAXFREQ = 10.
-N_COMPONENTS = 50
+if KERNEL =='cosine':
+    N_COMPONENTS = 1
+else:
+    N_COMPONENTS = 50
 MAXITER = 1000
 
 # %% [markdown]
@@ -79,9 +85,24 @@ INIT_METHOD = 'rbf'
 #INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-12
+ALPHA = 1e-24
 
-if INIT_METHOD == 'Periodogram':
+if KERNEL == 'cosine':
+    #NOTE -- these will just be used as dummy variables in this initaliation
+    means_np, bandwidths_np, powers_np = neutral_initial_components(
+        X_cond.reshape((-1,1)), 
+        Y_cond.ravel(), 
+        [MAXFREQ], 
+        n_components=N_COMPONENTS,
+        x_interval = [X_cond.max() -  X_cond.min()],
+        deltas = DELTAS,                                                                   
+        )
+    #NOTE -- let's take a lower frequency
+    means_np = np.ones_like(means_np) * 5.0
+    bandwidths_np = np.ones_like(bandwidths_np) * 1e-2
+    powers_np = np.ones_like(bandwidths_np) * 1.0
+
+elif INIT_METHOD == 'Periodogram':
 
     means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(
         X_cond.reshape((-1,1)), 
@@ -129,8 +150,13 @@ powers_np = [np.float64(np_float) for np_float in powers_np]
 print('powers_np')
 print(powers_np)
 
-kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
-    bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
+
+if KERNEL=='cosine':
+    kern = gpflow.kernels.SpectralDiracDeltaBlock(means= means_np, 
+    bandwidths= bandwidths_np, powers=powers_np, alpha = 0.)
+elif KERNEL=='multisinc':
+    kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
+        bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
 
 def plot_kernel_samples(ax: Axes, kernel: gpflow.kernels.SpectralKernel) -> None:
     X = np.zeros((0, 1))
