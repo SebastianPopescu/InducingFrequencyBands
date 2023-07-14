@@ -106,9 +106,9 @@ assert MAXFREQ < NYQUIST_FREQ, "MAXFREQ has to be lower than the Nyquist frequen
 N_COMPONENTS = 50
 MAXITER = 1000
 
-#INIT_METHOD = 'rbf'
+INIT_METHOD = 'rbf'
 #INIT_METHOD = 'Periodogram'
-INIT_METHOD = 'Neutral'
+#INIT_METHOD = 'Neutral'
 DELTAS = 1e-3 #NOTE -- this doesn't  matter
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
 ALPHA = 1e-12
