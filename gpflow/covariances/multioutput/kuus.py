@@ -23,7 +23,6 @@ from ...inducing_variables import (
     InducingPoints,
     FallbackSeparateIndependentSpectralInducingVariables,
     FallbackSharedIndependentSpectralInducingVariables,
-    RectangularSpectralInducingPoints,
 )
 from ...kernels import (
     IndependentLatent,
@@ -47,21 +46,6 @@ def Kuu_generic(
     M = tf.shape(Kmm)[0] * tf.shape(Kmm)[1]
     jittermat = jitter * tf.reshape(tf.eye(M, dtype=Kmm.dtype), tf.shape(Kmm))
     return Kmm + jittermat
-
-
-@Kuu.register(InducingPoints, MultioutputKernel)
-@check_shapes(
-    "inducing_variable: [M, D, 1]",
-    "return: [M, P, M, P]",
-)
-def Kuu_spectral_generic(
-    inducing_variable: RectangularSpectralInducingPoints, kernel: MultioutputKernel, *, jitter: float = 0.0
-) -> tf.Tensor:
-    Kmm = kernel(inducing_variable.Z, full_cov=True, full_output_cov=True)
-    M = tf.shape(Kmm)[0] * tf.shape(Kmm)[1]
-    jittermat = jitter * tf.reshape(tf.eye(M, dtype=Kmm.dtype), tf.shape(Kmm))
-    return Kmm + jittermat
-
 
 @Kuu.register(FallbackSharedIndependentInducingVariables, SharedIndependent)
 @check_shapes(

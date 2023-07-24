@@ -22,7 +22,8 @@ from deprecated import deprecated
 
 from ..base import Module, Parameter, TensorData, TensorType
 from ..utilities import positive
-from ..kernels import MultipleSpectralBlock
+from ..kernels import Kernel
+from ..kernels.spectral_utils import matern_spectral_density
 
 class SpectralInducingVariables(Module, abc.ABC):
     """
@@ -59,45 +60,48 @@ class SpectralInducingVariables(Module, abc.ABC):
           variable).
         """
 
-class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
+class SpectralInducingPointsBase(SpectralInducingVariables):
     def __init__(self, 
-        kern: MultipleSpectralBlock,
+        a,
+        b,
+        omegas, 
         name: Optional[str] = None
         ):
         """
-        :param kern: contains all the information needed to parametrize 
-        :param means: #TODO -- document param and expected shape as well
-        :param bandwidths: #TODO -- document param and expected shape as well
-        :param variances:#TODO -- focument param and expected shape as well
+        :param omegas: #TODO -- document it 
+        :param a: #TODO -- document param and expected shape as well
+        :param b: #TODO -- document param and expected shape as well
         """
 
         super().__init__(name=name)
-        self.kern = kern
+        self.a = a
+        self.b = b
+        self.omegas = omegas
 
     @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
     @check_shapes(
         "return: []",
     )
     def num_inducing(self) -> Optional[tf.Tensor]:
-        return self.kern.n_components
+        return tf.shape(self.omegas)[0]
 
     @property
     def shape(self) -> Shape:
-        shape = self.kern.means.shape
+        shape = self.omegas.shape #FIXME -- not sure this is right, might not cause any problems downstream though
         if not shape:
             return None
         return tuple(shape) + (1,)
 
+    def spectrum(self, kernel):
+        
+        return matern_spectral_density(self.omegas, kernel)
 
-class RectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
+
+class SpectralInducingPoints(SpectralInducingPointsBase):
     """
     Real-space (in output space) "spectral" inducing points with a PSD given by 
-    symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
+    the spectrum of the kernel used, currently supporting just the Matern1/2.
     """
 
-class RectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
-    """
-    Real-space (in output space) "spectral" inducing points with a PSD given by 
-    symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
-    """
+
 

@@ -21,7 +21,7 @@ from packaging.version import Version
 from .base import TensorType
 from .config import default_float, default_jitter
 from .covariances import Kuu
-from .inducing_variables import InducingVariables, RectangularSpectralInducingPoints
+from .inducing_variables import InducingVariables
 from .kernels import Kernel, MultipleSpectralBlock
 from .utilities import Dispatcher, to_default_float
 
@@ -38,29 +38,6 @@ prior_kl = Dispatcher("prior_kl")
 def _(
     inducing_variable: InducingVariables,
     kernel: Kernel,
-    q_mu: TensorType,
-    q_sqrt: TensorType,
-    whiten: bool = False,
-) -> tf.Tensor:
-    if whiten:
-        return gauss_kl(q_mu, q_sqrt, None)
-    else:
-        K = Kuu(inducing_variable, kernel, jitter=default_jitter())  # [P, M, M] or [M, M]
-        return gauss_kl(q_mu, q_sqrt, K)
-
-
-
-
-@prior_kl.register(RectangularSpectralInducingPoints, MultipleSpectralBlock, object, object)
-@check_shapes(
-    "inducing_variable: [N, D, broadcast L]",
-    "q_mu: [M, L]",
-    "q_sqrt: [M_L_or_L_M_M...]",
-    "return: []",
-)
-def _(
-    inducing_variable: RectangularSpectralInducingPoints,
-    kernel: MultipleSpectralBlock,
     q_mu: TensorType,
     q_sqrt: TensorType,
     whiten: bool = False,

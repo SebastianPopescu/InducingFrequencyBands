@@ -47,7 +47,6 @@ from .inducing_variables import (
     InducingVariables,
     SeparateIndependentInducingVariables,
     SharedIndependentInducingVariables,
-    RectangularSpectralInducingPoints,
 )
 
 from .kernels import Kernel, MultipleSpectralBlock
@@ -1049,12 +1048,7 @@ def _get_posterior_base_case(
     # independent single output
     return IndependentPosteriorSingleOutput
 
-@get_posterior_class.register(MultipleSpectralBlock, RectangularSpectralInducingPoints)
-def _get_posterior_base_spectral_case(
-    kernel: MultipleSpectralBlock, inducing_variable: RectangularSpectralInducingPoints
-) -> Type[BasePosterior]:
-    # independent single output
-    return IndependentPosteriorSingleOutput
+
 
 
 @get_posterior_class.register(kernels.MultioutputKernel, InducingPoints)

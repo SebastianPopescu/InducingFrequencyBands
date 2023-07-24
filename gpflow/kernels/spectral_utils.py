@@ -6,8 +6,24 @@ import math
 
 import tensorflow as tf
 from gpflow.config import default_float
+from ..kernels import Matern12, Matern32, Matern52
 
 TINY = 1e-20
+
+
+def matern_spectral_density(freq, kernel):
+
+    if isinstance(kernel, Matern12):
+
+        lamb = tf.math.reciprocal(kernel.lengthscales)
+        S = (2. * kernel.variance * lamb ) / (lamb**2 + freq**2)   
+    
+    elif isinstance(kernel, Matern32):
+        pass
+    elif isinstance(kernel, Matern52):
+        pass
+
+    return S 
 
 
 def sinc(x, apply_normalisation=True):

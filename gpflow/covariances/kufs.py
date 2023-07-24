@@ -18,7 +18,7 @@ from check_shapes import check_shapes
 
 from ..base import TensorLike, TensorType
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, Matern12
 from .dispatch import Kuf
 
 
@@ -47,37 +47,35 @@ def Kuf_spectral_kernel_inducingpoints(
 
     return Kzf
 
-
-@Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
+@Kuf.register(SpectralInducingVariables, Matern12, TensorLike)
 #TODO -- re-introduce the check_shapes 
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",
 #    "Xnew: [batch..., N, D]",
 #    "return: [M, batch..., N]",
 #)
-def Kuf_block_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, Xnew: TensorType
+def Kuf_L2_features_spectral_kernel_inducingpoints(
+    inducing_variable: SpectralInducingVariables, kernel: Matern12, Xnew: TensorType
 ) -> tf.Tensor:
 
-    _means = kernel.means # expected shape [D, M]
-    _bandwidths = kernel.bandwidths # expected shape [D, M]
-    _powers = kernel.powers # expected shape [M, ]
-
-    sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
+    lamb = 1.0 / kernel.lengthscales
     
-    cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
+    omegas = inducing_variable.omegas # shape - [M, ]   
+    spectrum = inducing_variable.spectrum(kernel) # shape - [M, ] 
+    a = inducing_variable.a 
+    b = inducing_variable.b 
+    
+    #NOTE -- corresponds to real part of equation 46 from VFF paper.
+    real_part = spectrum * tf.math.cos(omegas * (Xnew - a))
+    real_part += spectrum * tf.math.reciprocal(2. * lamb) * (lamb * ( tf.math.exp(a - Xnew) 
+                                                                     - tf.math.exp(Xnew - b) ))
+    #NOTE -- corresponds to imaginary part of equation 46 from VFF paper.
+    imaginary_part = spectrum * tf.math.sin(omegas * (Xnew - a))
+    imaginary_part += spectrum  * tf.math.reciprocal(2. * lamb) * spectrum * (tf.math.exp(a - Xnew) 
+                                                                              - tf.math.exp(Xnew - b))
 
-    pre_multiplier = 2. * _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
+    return tf.stack([real_part, imaginary_part], 0) # shape - [2M, N]
 
-    Kzf  = pre_multiplier[..., None] * sine_term * cosine_term # expected shape (M, N)
-
-    return Kzf
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)
 @check_shapes(
