@@ -43,7 +43,7 @@ import gpflow
 from gpflow.ci_utils import reduce_in_tests
 from gpflow.init import riemann_approximate_periodogram_initial_components, rbf_spectral_density, neutral_initial_components, riemann_approximate_rbf_initial_components
 from gpflow.kernels.initialisation_spectral_np import np_disjoint_initial_components
-
+from gpflow.inducing_variables import SpectralInducingPoints
 # for reproducibility of this notebook:
 rng = np.random.RandomState(123)
 tf.random.set_seed(42)
@@ -69,18 +69,20 @@ Y_cond = func(X_cond) + 0.2 * rng.randn(N, )  # Noisy Y values
 MODEL = 'SGPR'
 # %% [markdown]
 # # Can choose between 'multisinc' (i.e., corresponds to symmetrical rectangular blocks for both
-# # Inducing Frequency Bands and GP-MultiSinc) and 'cosine' (i.e., dirac delta functions in the kernel spectrum)
-KERNEL = 'multisinc' #'cosine'
+# # Inducing Frequency Bands and GP-MultiSinc), 'cosine' (i.e., dirac delta functions in the kernel spectrum)
+## and Matern12 (i.e., corresponds to L2 features VFF)
+KERNEL = 'Matern12' #'multisinc' #'cosine'
 MAXFREQ = 10.
 if KERNEL =='cosine':
     N_COMPONENTS = 1
 else:
-    N_COMPONENTS = 50
+    N_COMPONENTS = 500
 MAXITER = 1000
 
 # %% [markdown]
-# # Can choose between 'rbf', 'Periodogram' or 'Neutral'
-INIT_METHOD = 'rbf'
+# # Can choose between 'rbf', 'Periodogram' or 'Neutral', 'Kernel'
+INIT_METHOD = 'Kernel'
+#INIT_METHOD = 'rbf'
 #INIT_METHOD = 'Periodogram' 
 #INIT_METHOD ='Neutral'
 DELTAS = 1e-1
@@ -129,6 +131,21 @@ elif INIT_METHOD == 'rbf':
         x_interval = [X_cond.max() -  X_cond.min()]
         )
 
+elif KERNEL == 'Matern12':
+    #NOTE -- these will just be used as dummy variables since they are not needed
+    means_np, bandwidths_np, powers_np = neutral_initial_components(
+        X_cond.reshape((-1,1)), 
+        Y_cond.ravel(), 
+        [MAXFREQ], 
+        n_components=N_COMPONENTS,
+        x_interval = [X_cond.max() -  X_cond.min()],
+        deltas = DELTAS,                                                                   
+        )
+    #NOTE -- let's take a lower frequency
+    means_np = np.ones_like(means_np) * 5.0
+    bandwidths_np = np.ones_like(bandwidths_np) * 1e-2
+    powers_np = np.ones_like(bandwidths_np) * 1.0
+
 X_cond = X_cond.reshape((-1, 1))
 Y_cond = Y_cond.reshape((-1, 1))
 
@@ -157,6 +174,15 @@ if KERNEL=='cosine':
 elif KERNEL=='multisinc':
     kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
         bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
+elif KERNEL=='Matern12':
+
+    a = -0.5
+    b = 1.5
+    #N_COMPONENTS - Number of spectral inducing points
+    ms = np.arange(N_COMPONENTS) # this should be the usual ms for general experiments
+    omegas = (2.0 * np.pi * ms) / (b - a)
+
+    kern = gpflow.kernels.Matern12(variance = 1.0, lengthscales= (b - a)/10.)
 
 def plot_kernel_samples(ax: Axes, kernel: gpflow.kernels.SpectralKernel) -> None:
     X = np.zeros((0, 1))
@@ -179,22 +205,31 @@ def plot_kernel_prediction(
     #X = np.array([[-0.5], [0.0], [0.4], [0.5]])
     #Y = np.array([[1.0], [0.0], [0.6], [0.4]])
     
+
     if MODEL=='GPR':
         model = gpflow.models.GPR(
             (X_cond, Y_cond), kernel=deepcopy(kernel), noise_variance=1e-3
         )
     elif MODEL=='SGPR':
-        ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kernel)
-        model = gpflow.models.SGPR(
-            data = (X_cond, Y_cond), kernel=deepcopy(kernel), inducing_variable = ind_var, noise_variance=1e-3
-        )
+        
+        if KERNEL=='Matern12':
+            ind_pts = SpectralInducingPoints(a = a, b = b, omegas = omegas)
+            model = gpflow.models.SGPR(
+                data = (X_cond, Y_cond), kernel=deepcopy(kernel), inducing_variable = ind_pts, noise_variance=1e-3
+            )
+
+        else:
+            ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kernel)
+            model = gpflow.models.SGPR(
+                data = (X_cond, Y_cond), kernel=deepcopy(kernel), inducing_variable = ind_var, noise_variance=1e-3
+            )
 
     if optimise:
         gpflow.set_trainable(model.likelihood, False)
         opt = gpflow.optimizers.Scipy()
         opt.minimize(model.training_loss, model.trainable_variables)
 
-    Xplot = np.linspace(-5.0, 5.5, 100)[:, None]
+    Xplot = np.linspace(a, b, 100)[:, None]
 
     if MODEL=='GPR':
         f_mean, f_var = model.predict_f(Xplot, full_cov=False)
@@ -274,17 +309,29 @@ def plot_kernel(
         _, (samples_ax, prediction_ax, spectrum_ax) = plt.subplots(nrows=3, ncols=1, figsize=(15, 10 * 3))
         plot_kernel_samples(samples_ax, kernel)
         plot_kernel_prediction(prediction_ax, kernel, optimise=optimise)
-        plot_spectrum_blocks(spectrum_ax, data_object)
+        if KERNEL =='Matern12':
+            pass
+        else:
+            plot_spectrum_blocks(spectrum_ax, data_object)
     elif MODEL=='SGPR':
-        _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_ax, 
-            spectrum_ax) = plt.subplots(nrows=4, ncols=1, figsize=(15, 10 * 4))
+        if KERNEL =='Matern12':
+            _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_ax, 
+                spectrum_ax) = plt.subplots(nrows=4, ncols=1, figsize=(15, 10 * 4))
+        else:
+            _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_ax, 
+                spectrum_ax) = plt.subplots(nrows=3, ncols=1, figsize=(15, 10 * 3))
         plot_kernel_samples(samples_ax, kernel)
         plot_kernel_prediction(prediction_parametric_ax, kernel, optimise=optimise)
-        plot_kernel_prediction(prediction_non_parametric_ax, kernel, optimise=optimise, parametric=False)
-        plot_spectrum_blocks(spectrum_ax, data_object)
+        plot_kernel_prediction(prediction_non_parametric_ax, kernel, optimise=optimise, 
+                               parametric=False)
+        if KERNEL =='Matern12':
+            pass
+        else:
+            plot_spectrum_blocks(spectrum_ax, data_object)
 
     plt.tight_layout()
     plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_exploration.png')
     plt.close()
 
-plot_kernel(kern)
+#TODO -- optimise = True seems to encounter numerical issues
+plot_kernel(kern, optimise = False)

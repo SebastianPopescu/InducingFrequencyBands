@@ -48,12 +48,13 @@ tf.random.set_seed(42)
 # In this notebook we use the same hyperparameters as in Figure 2 of VFF paper.
 # ωm = 16π/(b − a), and a lengthscale of l = (b − a)/10.
 
-a = -5.
-b = 5.
+a = -10.
+b = 10.
 N = 1000  # Number of training observations
-MARGIN = 2.
+MARGIN = 0.5
 X = np.linspace(a-MARGIN, b+MARGIN, N)  # X values to evaluate Kuf at
 X = X.astype(np.float64)
+X = X.reshape((-1,1))
 
 print('shape of data')
 print(X.shape)
