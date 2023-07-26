@@ -78,7 +78,7 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     #omegas = tf.reshape(omegas, [-1,1]) # shape - [M, 1]   
     #spectrum = inducing_variable.spectrum(kernel) # shape - [M, ] 
 
-    #cosine block
+    #cosine block -- corresponds to equation 99 in VFF paper.
     Kzz_cosine = -(2. * lamb**2) # shape - [1,]
     Kzz_cosine *= 1. - tf.math.exp(lamb * (a-b)) # shape - [1,]
     Kzz_cosine /= lamb**2 + tf.reshape(omegas**2,[-1,1]) # shape - [M, 1]
@@ -87,9 +87,11 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     print(Kzz_cosine)
 
     #addition of diagonal specific terms to cosine block
+    # corresponds to equation 100 in VFF paper.
     diagonal_cosine = (b-a) * lamb
     diagonal_cosine /= lamb**2 + omegas**2
     #specific addition just for the first cosine of the harmonics
+    # corresponds to equation 101 in VFF paper.
     scaling_list = [2.]
     upto = tf.shape(omegas)[0] - 1
     scaling_list.extend([1. for _ in range(upto)])
@@ -100,16 +102,17 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     print('cosine block')
     print(Kzz_cosine)
 
-    #sine block
+    #sine block - corresponds to equation 105 in VFF paper.
     #NOTE -- we don't want to use zero freq for sine features
-    Kzz_sine = 2. * tf.reshape(omegas[omegas != 0], [-1,1]) * tf.reshape(omegas[omegas != 0], [1,-1]) # shape - [M-1, M-1]
+    Kzz_sine = 2. * tf.reshape(omegas[omegas != 0], [-1,1]) * tf.reshape(
+        omegas[omegas != 0], [1,-1]) # shape - [M-1, M-1]
     Kzz_sine *= 1. - tf.math.exp(lamb * (a-b))
     Kzz_sine /= lamb**2 + tf.reshape(omegas[omegas != 0], [-1,1])**2
     Kzz_sine /= lamb**2 + tf.reshape(omegas[omegas != 0], [1,-1])**2
     print('sine block')
     print(Kzz_sine)
 
-    #addition of diagonal specific terms to sine block
+    #addition of diagonal specific terms to sine block - corresponds to equation 106 in VFF paper.
     diagonal_sine = (b - a) * lamb 
     diagonal_sine /= lamb**2 + omegas[omegas != 0]**2
     Kzz_sine += tf.linalg.diag(diagonal_sine) #  shape - [M-1, M-1]
