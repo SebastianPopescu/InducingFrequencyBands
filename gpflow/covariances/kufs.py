@@ -18,7 +18,7 @@ from check_shapes import check_shapes
 
 from ..base import TensorLike, TensorType
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, Matern12
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, L2_Matern12, RKHS_Matern12
 from .dispatch import Kuf
 
 
@@ -47,7 +47,7 @@ def Kuf_spectral_kernel_inducingpoints(
 
     return Kzf
 
-@Kuf.register(SpectralInducingVariables, Matern12, TensorLike)
+@Kuf.register(SpectralInducingVariables, L2_Matern12, TensorLike)
 #FIXME -- re-introduce the check_shapes 
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",
@@ -55,7 +55,7 @@ def Kuf_spectral_kernel_inducingpoints(
 #    "return: [M, batch..., N]",
 #)
 def Kuf_L2_features_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: Matern12, Xnew: TensorType
+    inducing_variable: SpectralInducingVariables, kernel: L2_Matern12, Xnew: TensorType
 ) -> tf.Tensor:
 
     print('--- inside Kuf ---')
@@ -85,6 +85,33 @@ def Kuf_L2_features_spectral_kernel_inducingpoints(
     print(_Kuf)
     #FIXME -- why are we getting the transpsoe?
     return tf.transpose(_Kuf) # shape - [2M - 1, N]
+
+
+@Kuf.register(SpectralInducingVariables, RKHS_Matern12, TensorLike)
+#FIXME -- re-introduce the check_shapes 
+#@check_shapes(
+#    "inducing_variable: [M, D, 1]",
+#    "Xnew: [batch..., N, D]",
+#    "return: [M, batch..., N]",
+#)
+def Kuf_RKHS_features_spectral_kernel_inducingpoints(
+    inducing_variable: SpectralInducingVariables, kernel: RKHS_Matern12, Xnew: TensorType
+) -> tf.Tensor:
+
+    lamb = 1.0 / kernel.lengthscales
+    
+    omegas = inducing_variable.omegas # shape - [M, ]   
+    spectrum = inducing_variable.spectrum(kernel) # shape - [M, ] 
+    a = inducing_variable.a 
+    b = inducing_variable.b 
+
+    #No edges case.
+    Kuf_cos = tf.transpose(tf.cos(omegas * (Xnew- a)))
+    omegas = omegas[omegas != 0]  # don't compute zeros freq.
+    Kuf_sin = tf.transpose(tf.sin(omegas * (Xnew - a)))
+    
+    return tf.concat([Kuf_cos, Kuf_sin], axis=0)
+
 
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)

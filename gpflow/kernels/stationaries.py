@@ -271,6 +271,17 @@ class Matern12(IsotropicStationary):
         return self.variance * tf.exp(-r)
 
 
+
+class L2_Matern12(Matern12):
+    """
+    Wrapper class for Matern 1/2 kernel to be used for covariance dispatcher.
+    """
+
+class RKHS_Matern12(Matern12):
+    """
+    Wrapper class for Matern 1/2 kernel to be used for covariance dispatcher.
+    """
+
 class Matern32(IsotropicStationary):
     """
     The Matern 3/2 kernel. Functions drawn from a GP with this kernel are once

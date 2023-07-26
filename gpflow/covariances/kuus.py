@@ -18,9 +18,9 @@ from check_shapes import check_shapes
 
 from ..config import default_float
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, Matern12 
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, L2_Matern12, RKHS_Matern12 
 from .dispatch import Kuu
-
+from gpflow.matrix_structures import Rank1Mat, BlockDiagMat
 
 @Kuu.register(InducingPoints, Kernel)
 @check_shapes(
@@ -62,9 +62,9 @@ def Kuu_block_spectral_kernel_inducingpoints(
     return Kzz
 
 
-@Kuu.register(SpectralInducingVariables, Matern12)
+@Kuu.register(SpectralInducingVariables, L2_Matern12)
 def Kuu_L2_features_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: Matern12, *, jitter: float = 0.0
+    inducing_variable: SpectralInducingVariables, kernel: L2_Matern12, *, jitter: float = 0.0
 ) -> tf.Tensor:
     
     """
@@ -127,7 +127,37 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
+
+@Kuu.register(SpectralInducingVariables, RKHS_Matern12)
+def Kuu_RKHS_features_spectral_kernel_inducingpoints(
+    inducing_variable: SpectralInducingVariables, kernel: RKHS_Matern12, *, jitter: float = 0.0
+) -> tf.Tensor:
     
+    """
+    To be used for the rkhs features case of VFF.
+    """
+
+    lamb = 1.0 / kernel.lengthscales
+    a = inducing_variable.a 
+    b = inducing_variable.b 
+    omegas = inducing_variable.omegas # shape - [M, ]   
+    #omegas = tf.reshape(omegas, [-1,1]) # shape - [M, 1]   
+    #spectrum = inducing_variable.spectrum(kernel) # shape - [M, ] 
+
+    # cos part first
+    #NOTE -- wtf is this?
+    two_or_four = np.where(omegas == 0, 2.0, 4.0)
+    
+    d_cos = (b - a) * (tf.square(lamb) + tf.square(omegas)) / lamb / kernel.variance / two_or_four
+    v_cos = tf.ones(tf.shape(d_cos), default_float()) / tf.sqrt(kernel.variance)
+
+    # now the sin part
+    omegas = omegas[omegas != 0]  # don't compute omega=0
+    d_sin = (b - a) * (tf.square(lamb) + tf.square(omegas)) / lamb / kernel.variance / 4.0
+
+    return BlockDiagMat(Rank1Mat(d_cos, v_cos), tf.linalg.diag(d_sin))
+
+
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(
     "inducing_variable: [M, D, 1]",
