@@ -78,7 +78,7 @@ class InducingPointsBase(InducingVariables):
         "return: []",
     )
     def num_inducing(self) -> Optional[tf.Tensor]:
-        return tf.shape(self.Z)[0]
+        return tf.shape(self.Z)[0] 
 
     @property
     def shape(self) -> Shape:

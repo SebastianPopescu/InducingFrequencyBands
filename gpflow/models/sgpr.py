@@ -30,7 +30,7 @@ from ..utilities import add_noise_cov, assert_params_false, to_default_float
 from .model import GPModel
 from .training_mixins import InternalDataTrainingLossMixin
 from .util import InducingPointsLike, data_input_to_tensor, inducingpoint_wrapper
-
+from ..inducing_variables import SpectralInducingPoints
 
 class SGPRBase_deprecated(GPModel, InternalDataTrainingLossMixin):
     """
@@ -79,7 +79,11 @@ class SGPRBase_deprecated(GPModel, InternalDataTrainingLossMixin):
         self.data = X_data, Y_data
         self.num_data = X_data.shape[0]
 
-        self.inducing_variable: InducingPoints = inducingpoint_wrapper(inducing_variable)
+        #FIXME -- tmp workaround
+        if isinstance(inducing_variable, SpectralInducingPoints):
+            self.inducing_variable = inducing_variable
+        else:
+            self.inducing_variable: InducingPoints = inducingpoint_wrapper(inducing_variable)
 
     @check_shapes(
         "return: []",

@@ -48,7 +48,7 @@ def Kuf_spectral_kernel_inducingpoints(
     return Kzf
 
 @Kuf.register(SpectralInducingVariables, Matern12, TensorLike)
-#TODO -- re-introduce the check_shapes 
+#FIXME -- re-introduce the check_shapes 
 #@check_shapes(
 #    "inducing_variable: [M, D, 1]",
 #    "Xnew: [batch..., N, D]",
@@ -58,6 +58,7 @@ def Kuf_L2_features_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: Matern12, Xnew: TensorType
 ) -> tf.Tensor:
 
+    print('--- inside Kuf ---')
     lamb = 1.0 / kernel.lengthscales
     
     omegas = inducing_variable.omegas # shape - [M, ]   
@@ -69,12 +70,20 @@ def Kuf_L2_features_spectral_kernel_inducingpoints(
     real_part = spectrum * tf.math.cos(omegas * (Xnew - a))
     real_part += spectrum * tf.math.reciprocal(2. * lamb) * (lamb * ( tf.math.exp(a - Xnew) 
                                                                      - tf.math.exp(Xnew - b) ))
-    #NOTE -- corresponds to imaginary part of equation 46 from VFF paper.
-    imaginary_part = spectrum * tf.math.sin(omegas * (Xnew - a))
-    imaginary_part += spectrum  * tf.math.reciprocal(2. * lamb) * spectrum * (tf.math.exp(a - Xnew) 
-                                                                              - tf.math.exp(Xnew - b))
+    print('real part')
+    print(real_part)
 
-    return tf.stack([real_part, imaginary_part], 0) # shape - [2M, N]
+    #NOTE -- corresponds to imaginary part of equation 46 from VFF paper.
+    imaginary_part = spectrum[omegas != 0] * tf.math.sin(omegas[omegas != 0] * (Xnew - a))
+    imaginary_part += spectrum[omegas != 0]  * tf.math.reciprocal(2. * lamb) * spectrum[omegas != 0] * (tf.math.exp(a - Xnew) 
+                                                                              - tf.math.exp(Xnew - b))
+    print('im part')
+    print(imaginary_part)
+    _Kuf = tf.concat([real_part, imaginary_part], 1) 
+    print('Kuf')
+    print(_Kuf)
+    #FIXME -- why are we getting the transpsoe?
+    return tf.transpose(_Kuf) # shape - [2M - 1, N]
 
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)

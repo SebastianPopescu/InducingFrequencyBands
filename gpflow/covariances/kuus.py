@@ -18,7 +18,7 @@ from check_shapes import check_shapes
 
 from ..config import default_float
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel 
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, Matern12 
 from .dispatch import Kuu
 
 
@@ -61,94 +61,67 @@ def Kuu_block_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-def midpoint_rule(x, std, a, b, n, Burmann_series):
 
-    # Calculate the width of each subinterval
-    h = (b - a) / n
-    
-    # Calculate the midpoint values for each subinterval
-    mean_midpoints = tf.linspace(a + h/2, b - h/2, n)
-    
-    # Evaluate the function at the midpoint values
-
-
-    if Burmann_series:
-        #NOTE -- this is usign the Burmann series second order approximation
-        f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
-    else:
-        #NOTE -- this is using the default Tensorflow version
-        f_midpoints = tf.math.erf((x-mean_midpoints)/(tf.cast(tf.math.sqrt(2.),
-                                                               default_float())*std))
-
-    # Calculate the approximate integral using the midpoint rule formula
-    integral_approx = h * tf.reduce_sum(f_midpoints)
-    
-    return integral_approx
-
-
-def burmann_series_approx_erf(x, mean, std):
-
-    #\operatorname{erf}\left( \frac{w_{1}-w'}{\sqrt{\frac{2\alpha}{\pi^{2}}}} \right) 
-    res = burmann_series_second_order_approx((x-mean)/(tf.cast(tf.math.sqrt(2.),
-                                                               default_float())*std))
-
-    return res
-
-
-def burmann_series_second_order_approx(x):
-
-    """
-    Implements a Burmann Series approximation of order 2 to the ERF function
-    
-    Latex math code:
-
-    \operatorname{erf}\left( x \right) \approx \frac{2}{\sqrt{\pi}}
-    \operatorname{sgn}\left( x \right) \sqrt{1 - \exp{-x^{2}}} 
-    \left[ \frac{\sqrt{\pi}}{2} + \frac{31}{200}\exp{-x^{2}} 
-    - \frac{341}{8000}\exp{-2x^{2}}\right]   
-    """
-
-    res = tf.cast(2./tf.sqrt(np.pi), default_float()) * tf.math.sign(x) * tf.cast(tf.sqrt(1. - tf.math.exp(-x**2)), default_float())
-    res *= (np.pi/2. + 31./200. * tf.math.exp(-x**2) - 341./8000. * tf.math.exp(-2.*x**2))
-    return res
-
-@Kuu.register(SpectralInducingVariables, MultipleSpectralBlock)
-def Kuu_block_multi_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
+@Kuu.register(SpectralInducingVariables, Matern12)
+def Kuu_L2_features_spectral_kernel_inducingpoints(
+    inducing_variable: SpectralInducingVariables, kernel: Matern12, *, jitter: float = 0.0
 ) -> tf.Tensor:
     
-    #NOTE -- this is the unwindowed case
-    #Kzz = tf.linalg.diag(kernel.powers)
-    #Kzz = tf.cast(Kzz, default_float())
+    """
+    To be used for the L2 features case of VFF.
+    """
+    print('---- inside Kuu ------')
+    lamb = 1.0 / kernel.lengthscales
+    a = inducing_variable.a 
+    b = inducing_variable.b 
+    omegas = inducing_variable.omegas # shape - [M, ]   
+    #omegas = tf.reshape(omegas, [-1,1]) # shape - [M, 1]   
+    #spectrum = inducing_variable.spectrum(kernel) # shape - [M, ] 
 
-    #NOTE -- implements the following integral but approximated numerically
-    #NOTE -- erf is implemented via the second order Burmann series approximation
-    #TODO -- do I need  to use tf.stop_gradients here?
+    #cosine block
+    Kzz_cosine = -(2. * lamb**2) # shape - [1,]
+    Kzz_cosine *= 1. - tf.math.exp(lamb * (a-b)) # shape - [1,]
+    Kzz_cosine /= lamb**2 + tf.reshape(omegas**2,[-1,1]) # shape - [M, 1]
+    Kzz_cosine /= tf.reshape(lamb**2 + omegas**2, [1,-1]) # shape - [M,M]
+    print('cosine block')
+    print(Kzz_cosine)
 
-    num_approx_N = 1000
+    #addition of diagonal specific terms to cosine block
+    diagonal_cosine = (b-a) * lamb
+    diagonal_cosine /= lamb**2 + omegas**2
+    #specific addition just for the first cosine of the harmonics
+    scaling_list = [2.]
+    upto = tf.shape(omegas)[0] - 1
+    scaling_list.extend([1. for _ in range(upto)])
+    #FIXME -- tmp workaround
+    Kzz_cosine += tf.cast(tf.linalg.diag(diagonal_cosine), default_float()) * tf.cast(
+        tf.linalg.diag(scaling_list), default_float()) #  shape - [M,M]
+    #Kzz_cosine += tf.cast(tf.linalg.diag(diagonal_cosine), default_float())
+    print('cosine block')
+    print(Kzz_cosine)
 
-    Kzz = tf.linalg.diag(kernel.powers / (2. * kernel.bandwidths))
+    #sine block
+    Kzz_sine = 2. * tf.reshape(omegas[omegas != 0], [-1,1]) * tf.reshape(omegas[omegas != 0], [1,-1]) # shape - [M-1, M-1]
+    Kzz_sine *= 1. - tf.math.exp(lamb * (a-b))
+    Kzz_sine /= lamb**2 + tf.reshape(omegas[omegas != 0], [-1,1])**2
+    Kzz_sine /= lamb**2 + tf.reshape(omegas[omegas != 0], [1,-1])**2
+    print('sine block')
+    print(Kzz_sine)
 
-    lower_limit = kernel.means - 0.5 * kernel.bandwidths
-    upper_limit = kernel.means + 0.5 * kernel.bandwidths
-    
-    num_int_approx = midpoint_rule(upper_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
-                                                              , default_float()) / 
-                                   tf.cast(np.pi, default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N,
-                                   Burmann_series=False)
-    
-    num_int_approx -= midpoint_rule(lower_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
-                                                               , default_float()) / 
-                                    tf.cast(np.pi,default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N,
-                                   Burmann_series=False)
-    
-    Kzz *= tf.linalg.diag(num_int_approx)
+    #addition of diagonal specific terms to sine block
+    diagonal_sine = (b - a) * lamb 
+    diagonal_sine /= lamb**2 + omegas[omegas != 0]**2
+    Kzz_sine += tf.linalg.diag(diagonal_sine) #  shape - [M-1, M-1]
+    print('sine block')
+    print(Kzz_sine)
+    operator = tf.linalg.LinearOperatorBlockDiag([tf.linalg.LinearOperatorFullMatrix(Kzz_cosine), 
+                                                  tf.linalg.LinearOperatorFullMatrix(Kzz_sine)])
+    Kzz = operator.to_dense() # shape - [2M-1, 2M-1]
+    print('Kzz')
+    print(Kzz)
 
-
-    #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
-    return tf.squeeze(2. * Kzz, axis=0)
+    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
+    return Kzz
 
     
 @Kuu.register(Multiscale, SquaredExponential)
