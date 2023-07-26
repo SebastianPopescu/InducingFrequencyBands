@@ -101,6 +101,7 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     print(Kzz_cosine)
 
     #sine block
+    #NOTE -- we don't want to use zero freq for sine features
     Kzz_sine = 2. * tf.reshape(omegas[omegas != 0], [-1,1]) * tf.reshape(omegas[omegas != 0], [1,-1]) # shape - [M-1, M-1]
     Kzz_sine *= 1. - tf.math.exp(lamb * (a-b))
     Kzz_sine /= lamb**2 + tf.reshape(omegas[omegas != 0], [-1,1])**2

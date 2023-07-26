@@ -74,6 +74,7 @@ def Kuf_L2_features_spectral_kernel_inducingpoints(
     print(real_part)
 
     #NOTE -- corresponds to imaginary part of equation 46 from VFF paper.
+    #NOTE -- we don't want to use zero freq for sine features
     imaginary_part = spectrum[omegas != 0] * tf.math.sin(omegas[omegas != 0] * (Xnew - a))
     imaginary_part += spectrum[omegas != 0]  * tf.math.reciprocal(2. * lamb) * spectrum[omegas != 0] * (tf.math.exp(a - Xnew) 
                                                                               - tf.math.exp(Xnew - b))
