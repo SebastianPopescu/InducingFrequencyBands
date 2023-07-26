@@ -88,6 +88,10 @@ INIT_METHOD = 'Kernel'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
 ALPHA = 1e-24
+# %% [markdown]
+# # Can choose between 'RKHS', 'L2', ''. Only valid for Matern12 kernels within the VFF framework.
+FEATURES = 'RKHS' #'L2' #''
+
 
 if KERNEL == 'cosine':
     #NOTE -- these will just be used as dummy variables in this initaliation
@@ -179,10 +183,14 @@ elif KERNEL=='Matern12':
     a = -0.5
     b = 1.5
     #N_COMPONENTS - Number of spectral inducing points
+    # creating the harmonics
     ms = np.arange(N_COMPONENTS) # this should be the usual ms for general experiments
     omegas = (2.0 * np.pi * ms) / (b - a)
 
-    kern = gpflow.kernels.Matern12(variance = 1.0, lengthscales= (b - a)/10.)
+    if FEATURES=='RKHS':
+        kern = gpflow.kernels.RKHS_Matern12(variance = 1.0, lengthscales= (b - a)/10.)
+    elif FEATURES=='L2':
+        kern = gpflow.kernels.L2_Matern12(variance = 1.0, lengthscales= (b - a)/10.)
 
 def plot_kernel_samples(ax: Axes, kernel: gpflow.kernels.SpectralKernel) -> None:
     X = np.zeros((0, 1))
@@ -330,7 +338,7 @@ def plot_kernel(
             plot_spectrum_blocks(spectrum_ax, data_object)
 
     plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_exploration.png')
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{FEATURES}_{INIT_METHOD}_exploration.png')
     plt.close()
 
 #TODO -- optimise = True seems to encounter numerical issues
