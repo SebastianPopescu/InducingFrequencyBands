@@ -79,21 +79,22 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     #spectrum = inducing_variable.spectrum(kernel) # shape - [M, ] 
 
     #cosine block -- corresponds to equation 99 in VFF paper.
-    Kzz_cosine = -(2. * lamb**2) # shape - [1,]
+    Kzz_cosine = -(2. * tf.square(lamb)) # shape - [1,]
     Kzz_cosine *= 1. - tf.math.exp(lamb * (a-b)) # shape - [1,]
-    Kzz_cosine /= lamb**2 + tf.reshape(omegas**2,[-1,1]) # shape - [M, 1]
-    Kzz_cosine /= tf.reshape(lamb**2 + omegas**2, [1,-1]) # shape - [M,M]
+    Kzz_cosine /= tf.reshape(tf.square(lamb) + tf.square(omegas), [-1,1]) # shape - [M, 1]
+    Kzz_cosine /= tf.reshape(tf.square(lamb) + tf.square(omegas), [1,-1]) # shape - [M, M]
     print('cosine block')
     print(Kzz_cosine)
 
     #addition of diagonal specific terms to cosine block
     # corresponds to equation 100 in VFF paper.
     diagonal_cosine = (b-a) * lamb
-    diagonal_cosine /= lamb**2 + omegas**2
+    diagonal_cosine /= tf.square(lamb) + tf.square(omegas)
     #specific addition just for the first cosine of the harmonics
     # corresponds to equation 101 in VFF paper.
     scaling_list = [2.]
     upto = tf.shape(omegas)[0] - 1
+    #.TODO -- this causes an error when trying to train this model. Probably due to some tf.function mechanics
     scaling_list.extend([1. for _ in range(upto)])
     #FIXME -- tmp workaround
     Kzz_cosine += tf.cast(tf.linalg.diag(diagonal_cosine), default_float()) * tf.cast(
@@ -107,24 +108,27 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     Kzz_sine = 2. * tf.reshape(omegas[omegas != 0], [-1,1]) * tf.reshape(
         omegas[omegas != 0], [1,-1]) # shape - [M-1, M-1]
     Kzz_sine *= 1. - tf.math.exp(lamb * (a-b))
-    Kzz_sine /= lamb**2 + tf.reshape(omegas[omegas != 0], [-1,1])**2
-    Kzz_sine /= lamb**2 + tf.reshape(omegas[omegas != 0], [1,-1])**2
+    Kzz_sine /= tf.square(lamb) + tf.square(tf.reshape(omegas[omegas != 0], [-1,1]))
+    Kzz_sine /= tf.square(lamb) + tf.square(tf.reshape(omegas[omegas != 0], [1,-1]))
     print('sine block')
     print(Kzz_sine)
 
     #addition of diagonal specific terms to sine block - corresponds to equation 106 in VFF paper.
     diagonal_sine = (b - a) * lamb 
-    diagonal_sine /= lamb**2 + omegas[omegas != 0]**2
+    diagonal_sine /= tf.square(lamb) + tf.square(omegas[omegas != 0])
     Kzz_sine += tf.linalg.diag(diagonal_sine) #  shape - [M-1, M-1]
     print('sine block')
     print(Kzz_sine)
-    operator = tf.linalg.LinearOperatorBlockDiag([tf.linalg.LinearOperatorFullMatrix(Kzz_cosine), 
-                                                  tf.linalg.LinearOperatorFullMatrix(Kzz_sine)])
-    Kzz = operator.to_dense() # shape - [2M-1, 2M-1]
+    #operator = tf.linalg.LinearOperatorBlockDiag([tf.linalg.LinearOperatorFullMatrix(Kzz_cosine), 
+    #                                              tf.linalg.LinearOperatorFullMatrix(Kzz_sine)])
+    #Kzz = operator.to_dense() # shape - [2M-1, 2M-1]
+    Kzz = BlockDiagMat(Kzz_cosine, Kzz_sine)    
     print('Kzz')
     print(Kzz)
 
-    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
+    #NOTE -- doesn't seem to help that much
+    #Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
+    
     return Kzz
 
 
