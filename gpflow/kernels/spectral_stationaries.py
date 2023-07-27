@@ -413,7 +413,115 @@ class SpectralStationary(SpectralKernel):
         #NOTE -- this is to be used only for multi sinc kernels
         return tf.fill(tf.shape(X)[:-1], tf.squeeze(tf.reduce_sum(self.powers)))
 
+
+class DecomposedSpectralStationary(SpectralKernel):
+    """
+    Base class for decomposed spectral kernels that are stationary, that is, they only depend on
+
+        d = x - x'
+    and that are also based on cosine and sine transforms.
+        
+
+    This class handles 'ard' behaviour, which stands for 'Automatic Relevance
+    Determination'. This means that the kernel has one lengthscale per
+    dimension, otherwise the kernel is isotropic (has a single lengthscale).
+    """
+
+    #TODO -- reintroduce check_shapes
+    #@check_shapes(
+    #    "variance: []",
+    #    "lengthscales: [broadcast n_active_dims]",
+    #)
+    def __init__(
+        self, 
+        real_powers: TensorType, 
+        img_powers: TensorType, 
+        means: TensorType, 
+        bandwidths: TensorType,
+        alpha: TensorType,
+        **kwargs: Any
+    ) -> None:
+        """
+        :param real_powers: TODO
+        :param img_powers: TODO
+        :param means: TODO
+        :param bandwidths: TODO
+        :param alpha: TODO 
+        :param kwargs: accepts `name` and `active_dims`, which is a list or
+            slice of indices which controls which columns of X are used (by
+            default, all columns are used).
+        """
+        for kwarg in kwargs:
+            if kwarg not in {"name", "active_dims"}:
+                raise TypeError(f"Unknown keyword argument: {kwarg}")
+
+        super().__init__(**kwargs)
+
+        self.real_powers = Parameter(
+            real_powers,
+            transform=Exp(),  # type: ignore
+            name="real_powers",
+        )
+
+        self.img_powers = Parameter(
+            img_powers,
+            transform=Exp(),  # type: ignore
+            name="img_powers",
+        )
+
+        self.means = Parameter(
+            means,
+            transform=Exp(),  # type: ignore
+            name="means",
+        )
+
+        self.bandwidths = Parameter(
+            bandwidths,
+            transform=Exp(),  # type: ignore
+            name="bandwidths",
+        )
+        self._validate_ard_active_dims(self.means)
+
+        self.alpha = alpha
+
+    @property
+    def ard(self) -> bool:
+        """
+        Whether ARD behaviour is active.
+        """
+        ndims: int = self.means.shape.ndims
+        return ndims > 0
+
+    #TODO -- re-introduce check_shapes
+    #@check_shapes(
+    #    "X: [broadcast any...]",
+    #    "return: [any...]",
+    #)
+    def scale(self, X: TensorType) -> TensorType:
+        
+        """
+
+        For the Sinc kernel case, but not for 
+        Inducing Frequency Bands, nor multi Sinc kernel case.
+
+        :param X: expected shape [N, D]
+        :param self.means: expected shape [D, ]
+        
+        :return: expected shape [N, D]
+        """
+            
+        X_scaled = X * self.means if X is not None else X
+        
+        return X_scaled
+
+    @inherit_check_shapes
+    def K_diag(self, X: TensorType) -> tf.Tensor:
+        #NOTE -- this is to be used only for multi sinc kernels
+        return tf.fill(tf.shape(X)[:-1], tf.squeeze(tf.reduce_sum(self.real_powers + self.img_powers)))
+
+
 #NOTE -- I am not sure I am actually using this class anywhere
+# I think all spectral kernels use the anisotropic version.
 class IsotropicSpectralStationary(SpectralStationary):
     """
     Base class for isotropic stationary spectral kernels, i.e. kernels that only
@@ -494,6 +602,68 @@ class AnisotropicSpectralStationary(SpectralStationary):
             default, all columns are used).
         """
         super().__init__(powers, means, bandwidths, alpha,  **kwargs)
+
+    @inherit_check_shapes
+    def K(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:
+
+        return self.K_d(self.scaled_difference_matrix(X, X2))
+
+    @check_shapes(
+        "X: [batch..., N, D]",
+        "X2: [batch2..., N2, D]",
+        "return: [batch..., N, batch2..., N2, D] if X2 is not None",
+        "return: [batch..., N, N, D] if X2 is None",
+    )
+    def scaled_difference_matrix(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:
+        """
+        Returns [(X - X2ᵀ) / ℓ]. If X has shape [..., N, D] and
+        X2 has shape [..., M, D], the output will have shape [..., N, M, D].
+        """
+        return difference_matrix(self.scale(X), self.scale(X2))
+
+    @check_shapes(
+        "d: [batch..., N, D]",
+        "return: [batch..., N]",
+    )
+    def K_d(self, d: TensorType) -> tf.Tensor:
+        raise NotImplementedError
+
+
+class DecomposedAnisotropicSpectralStationary(DecomposedSpectralStationary):
+    """
+    Base class for decomposed anisotropic stationary spectral kernels, i.e. kernels that only
+    depend on
+
+        d = x - x'
+    and that are to be used in conjunction with cosine and sine transforms.
+        
+    Derived classes should implement K_d(self, d): Returns the kernel evaluated
+    on d, which is the pairwise difference matrix, scaled by the lengthscale
+    parameter ℓ (i.e. [(X - X2ᵀ) / ℓ]). The last axis corresponds to the
+    input dimension.
+    """
+
+    #TODO -- re-introduce check_Shapes 
+    #@check_shapes(
+    #    "variance: []",
+    #    "lengthscales: [broadcast n_active_dims]",
+    #)
+    def __init__(
+        self, 
+        real_powers: TensorType, 
+        img_powers: TensorType,
+        means: TensorType,
+        bandwidths: TensorType, 
+        alpha: TensorType,
+        **kwargs: Any
+    ) -> None:
+        
+        """
+        :param kwargs: accepts `name` and `active_dims`, which is a list or
+            slice of indices which controls which columns of X are used (by
+            default, all columns are used).
+        """
+        super().__init__(real_powers, img_powers, means, bandwidths, alpha,  **kwargs)
 
     @inherit_check_shapes
     def K(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:

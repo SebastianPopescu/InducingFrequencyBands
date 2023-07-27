@@ -8,7 +8,7 @@ from typing import Any, List, Optional
 
 import numpy as np
 import tensorflow as tf
-from gpflow.kernels.spectral_stationaries import AnisotropicSpectralStationary, SpectralSum
+from gpflow.kernels.spectral_stationaries import AnisotropicSpectralStationary, SpectralSum, DecomposedAnisotropicSpectralStationary
 from gpflow.kernels.base import Sum
 
 from gpflow.kernels.spectral_utils import sinc
@@ -237,6 +237,136 @@ class MultipleSpectralBlock(AnisotropicSpectralStationary):
         output = self.powers[:,None, None] * cos_term * sinc_term
     
         return tf.reduce_sum(output, axis = 0)
+
+
+class DecomposedMultipleSpectralBlock(DecomposedAnisotropicSpectralStationary):
+
+    """
+    TODO -- update the documentation.
+    The primitive kernel defined by multiple constant spectral density spanning finite bandwidths.
+    To be used for Inducing Frequency Bands models and gp-multiSinc.
+    Works with multi-dimensional data by taking a product over symmetrical rectangles for each input dimension.
+
+    """
+
+    def __init__(
+        self,
+        n_components: int,
+        real_powers,
+        img_powers,
+        means,
+        alpha,
+        bandwidths,
+        **kwargs: Any
+    ):
+        """
+        #TODO -- update documentation.
+        :param real_powers: The variance associated with the block. Expected shape [M, ]
+        (Corresponds to the power of the spectral block)
+        
+        :param img_powers: The variance associated with the block. Expected shape [M, ]
+        (Corresponds to the power of the spectral block)
+
+        :param means: Defined as the inverse of the mean frequency. Expected shape [D, M]
+        (Corresponds to the frequency location of the spectral block)
+        
+        :param bandwidths: The frequency range spanned by the spectral block. Expected shape [D, M]
+        (Corresponds to the delta) notation
+        
+        :param alpha: TODO missing param description
+
+        :param active_dims: TODO missing param description
+        """
+
+        super().__init__(real_powers = real_powers, img_powers = img_powers, 
+                         means = means, bandwidths = bandwidths, 
+                         alpha=alpha, **kwargs)
+
+        self.n_components = n_components
+
+    #TODO -- re-introduce check_shapes
+    #@check_shapes(
+    #    "X: [broadcast any...]",
+    #    "return: [any...]",
+    #)
+    def scale(self, X: TensorType) -> TensorType:
+        
+        """
+        Overwritting the default method from SpectralKernel.
+        
+        In the case of Inducing Frequency Bands or GP-MultiSinc
+        :param X: expected shape [N, D]
+        :param self.means: expected shape [D, M]
+        
+        :return: expected shape [N, D, M]
+        """
+
+        X_scaled = tf.expand_dims(X, axis =-1) * tf.expand_dims(self.means, axis = 0)
+
+        return X_scaled
+
+
+    #TODO -- reintroduce check_shapes
+    #@check_shapes(
+    #    "X: [batch..., N, D]",
+    #    "X2: [batch2..., N2, D]",
+    #    "return: [batch..., N, batch2..., N2, D] if X2 is not None",
+    #    "return: [batch..., N, N, D] if X2 is None",
+    #)
+    def scaled_difference_matrix(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:
+        """
+        
+        We are overriding the default method from AnisotropicSpectralStationary 
+        just for the Inducing Frequency Bands project or GP-MultiSinc.
+        
+        #TODO -- update the documentation here
+        Returns [(X - X2ᵀ) / ℓ]. If X has shape [..., N, D] and
+        X2 has shape [..., M, D], the output will have shape [..., N, M, D].
+        """
+        if X2 is None:
+            X2 = X
+        
+        diff_matrix = batched_difference_matrix(tf.transpose(self.scale(X), [2, 0, 1]), # expected shape [M, N1, D] 
+            tf.transpose(self.scale(X2), [2, 0, 1]) # expected shape [M, N2, D] 
+            ) # expected shape [M, N1, N2, D]
+
+        return diff_matrix
+
+
+    def K_d(self, d):
+        """
+
+        :param d: expected_shape [M, N1, N2, D]
+       
+        Implements anisotropic version of MultiSinc kernel 
+        (i.e., multi-block variant of Tobar's SincGP paper).
+
+        Computes the multi-block variant of this:
+            SK(d) = σ2 sinc(∆t) cos(2πξd)
+            where:
+             σ2 - magnitude
+             ∆ - bandwidth
+             ξ - frequency
+        Remainder: because of scale function, in our implementation d is already multipled by frequency/means             
+
+        returns: expected_shape [N1,N2]
+        """
+
+        #TODO -- shouldn't this be a reduce_prod last dim outside tf.cos???
+        cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) #[M, N1, N2]
+    
+        pre_multiplier = tf.transpose(self.bandwidths / self.means) # [M, D]
+        
+        sinc_term = tf.reduce_prod(
+            sinc(tf.multiply( d, #[M, N1, N2, D]
+            pre_multiplier[:, None, None, :] # [M, 1, 1, D]
+        ))
+        , axis = -1 ) # [M, N1, N2]
+
+        output = (self.real_powers[:, None, None] + self.img_powers[:, None, None]) * cos_term * sinc_term
+    
+        return tf.reduce_sum(output, axis = 0)
+
 
 
 

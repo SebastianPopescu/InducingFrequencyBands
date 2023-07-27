@@ -17,8 +17,8 @@ import numpy as np
 from check_shapes import check_shapes
 
 from ..config import default_float
-from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel 
+from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, DecomposedMultipleSpectralBlock
 from .dispatch import Kuu
 
 
@@ -61,6 +61,8 @@ def Kuu_block_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
+
+#Helper functions 
 def midpoint_rule(x, std, a, b, n, Burmann_series):
 
     # Calculate the width of each subinterval
@@ -112,10 +114,10 @@ def burmann_series_second_order_approx(x):
     res *= (np.pi/2. + 31./200. * tf.math.exp(-x**2) - 341./8000. * tf.math.exp(-2.*x**2))
     return res
 
-@Kuu.register(SpectralInducingVariables, MultipleSpectralBlock)
-def Kuu_block_multi_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
-) -> tf.Tensor:
+
+# Helper function -- implements the approximation for a single spectral block for Kuu.
+def Kuu_single_block_multi_spectral_kernel_inducingpoints(
+    inducing_variable, kernel, means, powers, *, jitter: float = 0.0):
     
     #NOTE -- this is the unwindowed case
     #Kzz = tf.linalg.diag(kernel.powers)
@@ -127,10 +129,10 @@ def Kuu_block_multi_spectral_kernel_inducingpoints(
 
     num_approx_N = 1000
 
-    Kzz = tf.linalg.diag(kernel.powers / (2. * kernel.bandwidths))
+    Kzz = tf.linalg.diag(powers / (2. * kernel.bandwidths))
 
-    lower_limit = kernel.means - 0.5 * kernel.bandwidths
-    upper_limit = kernel.means + 0.5 * kernel.bandwidths
+    lower_limit = means - 0.5 * kernel.bandwidths
+    upper_limit = means + 0.5 * kernel.bandwidths
     
     num_int_approx = midpoint_rule(upper_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
                                                               , default_float()) / 
@@ -146,11 +148,68 @@ def Kuu_block_multi_spectral_kernel_inducingpoints(
     
     Kzz *= tf.linalg.diag(num_int_approx)
 
+    return tf.squeeze(Kzz, axis = 0)
 
-    #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
-    return tf.squeeze(2. * Kzz, axis=0)
 
+def BlockDiagMat(A, B):
+
+    tl_shape = tf.stack([A.shape[0], B.shape[1]])
+    br_shape = tf.stack([B.shape[0], A.shape[1]])
+    top = tf.concat([A, tf.zeros(tl_shape, default_float())], axis=1)
+    bottom = tf.concat([tf.zeros(br_shape, default_float()), B], axis=1)
+
+    return tf.concat([top, bottom], axis=0)
+
+
+@Kuu.register(SymRectangularSpectralInducingPoints, MultipleSpectralBlock)
+def Kuu_sym_block_multi_spectral_kernel_inducingpoints(
+    inducing_variable: SymRectangularSpectralInducingPoints, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
+) -> tf.Tensor:
     
+    #NOTE -- this is the unwindowed case
+    #Kzz = tf.linalg.diag(kernel.powers)
+    #Kzz = tf.cast(Kzz, default_float())
+
+    Kzz = Kuu_single_block_multi_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, kernel.means, kernel.powers)
+    #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
+    #NOTE -- doubling the results should account for the two symmetrical rectangular functions.
+    #TODO -- need to double check the maths here to be sure that a doubling is sufficient.
+    return 2. * Kzz
+
+@Kuu.register(AsymRectangularSpectralInducingPoints, DecomposedMultipleSpectralBlock)
+def Kuu_asym_block_multi_spectral_kernel_inducingpoints(
+    inducing_variable: AsymRectangularSpectralInducingPoints, kernel: DecomposedMultipleSpectralBlock, *, jitter: float = 0.0
+) -> tf.Tensor:
+
+    # Real features corresponding to the cosine transform
+    r_Kzz_positive_freq = Kuu_single_block_multi_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, kernel.means, kernel.real_powers)
+    r_Kzz_negative_freq = Kuu_single_block_multi_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, -kernel.means, kernel.real_powers)
+
+    print('--- inside Kuu ---')
+    print(tf.shape(r_Kzz_positive_freq))
+    print(tf.shape(r_Kzz_negative_freq))
+
+    #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
+    r_Kzz = BlockDiagMat(r_Kzz_positive_freq, r_Kzz_negative_freq)
+    
+    # Real features corresponding to the sine transform
+    i_Kzz_positive_freq = Kuu_single_block_multi_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, kernel.means, kernel.img_powers)
+    i_Kzz_negative_freq = Kuu_single_block_multi_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, -kernel.means, kernel.img_powers)
+    print(tf.shape(i_Kzz_positive_freq))
+    print(tf.shape(i_Kzz_negative_freq))
+
+    #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
+    i_Kzz = BlockDiagMat(i_Kzz_positive_freq, i_Kzz_negative_freq)
+
+    #NOTE -- I have to be careful in Kuf to maintain the real, imaginary features ordering
+    return BlockDiagMat(r_Kzz, i_Kzz)
+
+
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(
     "inducing_variable: [M, D, 1]",

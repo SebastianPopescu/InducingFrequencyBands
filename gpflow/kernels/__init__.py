@@ -48,6 +48,7 @@ from .stationaries import (  # isort:skip
 
 from .spectral import (
     MultipleSpectralBlock, 
+    DecomposedMultipleSpectralBlock,
     SpectralBlock, 
     MixtureSpectralGaussian,
     SpectralDiracDeltaBlock
@@ -56,6 +57,7 @@ from .spectral import (
 from .spectral_stationaries import (
     IsotropicSpectralStationary,
     AnisotropicSpectralStationary,
+    DecomposedAnisotropicSpectralStationary,
     SpectralKernel,
     SpectralSum,
     SpectralProduct
@@ -106,11 +108,13 @@ __all__ = [
     "periodic",
     "statics",
     "stationaries",
+    "DecomposedMultipleSpectralBlock",
     "MultipleSpectralBlock",
     "SpectralBlock", 
     "MixtureSpectralGaussian",
     "IsotropicSpectralStationary",
     "AnisotropicSpectralStationary",
+    "DecomposedAnisotropicSpectralStationary",
     "SpectralKernel",
     "SpectralSum",
     "SpectralProduct",

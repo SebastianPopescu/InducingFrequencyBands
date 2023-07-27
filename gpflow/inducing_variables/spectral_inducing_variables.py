@@ -89,15 +89,25 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
         return tuple(shape) + (1,)
 
 
-class RectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
+class SymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
     """
-    Real-space (in output space) "spectral" inducing points with a PSD given by 
-    symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
-    """
-
-class RectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
-    """
-    Real-space (in output space) "spectral" inducing points with a PSD given by 
-    symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
+    Real-space (in output space) "spectral" inter-domain inducing points with a PSD 
+    given by symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
     """
 
+
+class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
+    """
+    Real-space (in output space) "spectral" inter-domain inducing points with a PSD 
+    given by asymmetrical rectangles. Corresponding kernel is the multi sinc kernel,
+    where the powers of the individiaul sinc kernels stem from the summation of powers
+    of the asymetrical rectangular blocks corresponding to the cosine and sine transform,
+    respectively.
+    """
+
+    @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
+    @check_shapes(
+        "return: []",
+    )
+    def num_inducing(self) -> Optional[tf.Tensor]:
+        return self.kern.n_components * 4

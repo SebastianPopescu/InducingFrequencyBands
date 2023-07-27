@@ -20,7 +20,7 @@ from check_shapes import check_shapes
 
 from ..base import AnyNDArray
 from ..config import default_float
-from ..inducing_variables import InducingPoints, InducingVariables, RectangularSpectralInducingPoints
+from ..inducing_variables import InducingPoints, InducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
 from .model import BayesianModel
 from .training_mixins import Data, ExternalDataTrainingLossMixin
 
@@ -34,7 +34,9 @@ def inducingpoint_wrapper(inducing_variable: InducingVariablesLike) -> InducingV
     object or an array specifying InducingPoints positions.
     """
     
-    if isinstance(inducing_variable, RectangularSpectralInducingPoints):
+    if isinstance(inducing_variable, SymRectangularSpectralInducingPoints):
+        pass
+    elif isinstance(inducing_variable, AsymRectangularSpectralInducingPoints):
         pass
     elif not isinstance(inducing_variable, InducingVariables):
         inducing_variable = InducingPoints(inducing_variable)
