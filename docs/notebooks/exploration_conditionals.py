@@ -90,8 +90,9 @@ DELTAS = 1e-1
 ALPHA = 1e-24
 # %% [markdown]
 # # Can choose between 'RKHS', 'L2', ''. Only valid for Matern12 kernels within the VFF framework.
-FEATURES = 'RKHS' #'L2' #''
-
+FEATURES = 'L2' 
+#FEATURES = 'RKHS' 
+#FEATURES = ''
 
 if KERNEL == 'cosine':
     #NOTE -- these will just be used as dummy variables in this initaliation
@@ -341,5 +342,5 @@ def plot_kernel(
     plt.savefig(f'./figures/{MODEL}_{KERNEL}_{FEATURES}_{INIT_METHOD}_exploration.png')
     plt.close()
 
-#TODO -- optimise = True seems to encounter numerical issues
+#TODO -- optimise = True seems to encounter numerical issues for L2 features VFF.
 plot_kernel(kern, optimise = False)
