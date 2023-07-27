@@ -59,7 +59,7 @@ def func(x):
         + 0.5 * np.sin(x * 7 * 3.14)
     )
 
-N = 100  # Number of training observations
+N = 120  # Number of training observations
 
 X_cond = np.linspace(0, 1.0, N)  # X values
 Y_cond = func(X_cond) + 0.2 * rng.randn(N, )  # Noisy Y values
@@ -69,8 +69,13 @@ Y_cond = func(X_cond) + 0.2 * rng.randn(N, )  # Noisy Y values
 MODEL = 'SGPR'
 # %% [markdown]
 # # Can choose between 'multisinc' (i.e., corresponds to symmetrical rectangular blocks for both
-# # Inducing Frequency Bands and GP-MultiSinc) and 'cosine' (i.e., dirac delta functions in the kernel spectrum)
-KERNEL = 'multisinc' #'cosine'
+# # Inducing Frequency Bands and GP-MultiSinc), 'cosine' (i.e., dirac delta functions in the kernel spectrum)
+# # and 'decomposed_multisinc' (i.e., corresponds to asymmetrical rectangular blocks for
+# # Inducing Frequency Bands, which essentially translates to cosine and sine transforms as the features) 
+KERNEL = 'decomposed_multisinc'
+#KERNEL = 'multisinc' 
+#KERNEL = 'cosine'
+
 MAXFREQ = 10.
 if KERNEL =='cosine':
     N_COMPONENTS = 1
@@ -144,8 +149,10 @@ print(means_np.shape)
 print('bandwidths_np')
 print(bandwidths_np)
 print(bandwidths_np.shape)
-
-powers_np = [np.float64(np_float) for np_float in powers_np]
+if KERNEL=='decomposed_multisinc':
+    powers_np = [np.float64(np_float/2.) for np_float in powers_np]
+else:
+    powers_np = [np.float64(np_float) for np_float in powers_np]
 
 print('powers_np')
 print(powers_np)
@@ -157,6 +164,13 @@ if KERNEL=='cosine':
 elif KERNEL=='multisinc':
     kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
         bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
+elif KERNEL=='decomposed_multisinc':
+    kern = gpflow.kernels.DecomposedMultipleSpectralBlock(n_components=N_COMPONENTS, 
+                                                          means= means_np, 
+                                                          bandwidths= bandwidths_np, 
+                                                          real_powers= powers_np, 
+                                                          img_powers = powers_np,
+                                                          alpha=ALPHA)
 
 def plot_kernel_samples(ax: Axes, kernel: gpflow.kernels.SpectralKernel) -> None:
     X = np.zeros((0, 1))
@@ -184,7 +198,10 @@ def plot_kernel_prediction(
             (X_cond, Y_cond), kernel=deepcopy(kernel), noise_variance=1e-3
         )
     elif MODEL=='SGPR':
-        ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kernel)
+        if KERNEL=='multsinc':
+            ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kernel)
+        elif KERNEL=='decomposed_multisinc':
+            ind_var = gpflow.inducing_variables.AsymRectangularSpectralInducingPoints(kern = kernel)
         model = gpflow.models.SGPR(
             data = (X_cond, Y_cond), kernel=deepcopy(kernel), inducing_variable = ind_var, noise_variance=1e-3
         )
@@ -194,7 +211,7 @@ def plot_kernel_prediction(
         opt = gpflow.optimizers.Scipy()
         opt.minimize(model.training_loss, model.trainable_variables)
 
-    Xplot = np.linspace(-5.0, 5.5, 100)[:, None]
+    Xplot = np.linspace(-0.5, 1.5, 100)[:, None]
 
     if MODEL=='GPR':
         f_mean, f_var = model.predict_f(Xplot, full_cov=False)
@@ -257,10 +274,14 @@ def plot_spectrum_blocks(
         #ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), 
         #        label='$S_{aa}(\\nu)$', linewidth=.8)
 
+        if KERNEL=='decomposed_multisinc':
+            _kernel_powers = kern.real_powers[_] + kern.img_powers[_]
+        else:
+            _kernel_powers = kern.powers[_]
         spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
             tf.convert_to_tensor(kern.means[:,_]).numpy(), 
             tf.convert_to_tensor(kern.bandwidths[:,_]).numpy(), 
-            tf.convert_to_tensor(kern.powers[_]).numpy(), 
+            tf.convert_to_tensor(_kernel_powers).numpy(), 
             use_blocks = True)
 
         ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SymBand_'+str(_), 
