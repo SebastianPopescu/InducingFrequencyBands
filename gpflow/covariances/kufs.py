@@ -47,7 +47,7 @@ def Kuf_spectral_kernel_inducingpoints(
 
     return Kzf
 
-
+#TODO -- need to introduce these
 @Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
 #TODO -- re-introduce the check_shapes 
 #@check_shapes(
@@ -55,7 +55,7 @@ def Kuf_spectral_kernel_inducingpoints(
 #    "Xnew: [batch..., N, D]",
 #    "return: [M, batch..., N]",
 #)
-def Kuf_block_spectral_kernel_inducingpoints(
+def Kuf_sym_block_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, Xnew: TensorType
 ) -> tf.Tensor:
 
@@ -78,6 +78,51 @@ def Kuf_block_spectral_kernel_inducingpoints(
     Kzf  = pre_multiplier[..., None] * sine_term * cosine_term # expected shape (M, N)
 
     return Kzf
+
+#TODO -- need to introduce these
+@Kuf.register(SpectralInducingVariables, MultipleSpectralBlock, TensorLike)
+#TODO -- re-introduce the check_shapes 
+#@check_shapes(
+#    "inducing_variable: [M, D, 1]",
+#    "Xnew: [batch..., N, D]",
+#    "return: [M, batch..., N]",
+#)
+def Kuf_asym_block_spectral_kernel_inducingpoints(
+    inducing_variable: SpectralInducingVariables, kernel: MultipleSpectralBlock, Xnew: TensorType
+) -> tf.Tensor:
+
+    _means = kernel.means # expected shape [D, M]
+    _bandwidths = kernel.bandwidths # expected shape [D, M]
+    _powers = kernel.powers # expected shape [M, ]
+
+    #real part
+
+    r_sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
+        tf.transpose(Xnew)[None, ...] # [1, D, N]
+    ) #[M, D, N]
+    ), axis = 1) #[M, N]
+    
+    r_cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+        tf.transpose(Xnew)[None, ...] # [1, D, N]
+    ) #[M, D, N]
+    ), axis = 1) #[M, N]
+
+    r_pre_multiplier = _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
+
+    real_part  = r_pre_multiplier[..., None] * r_sine_term * r_cosine_term # expected shape (M, N)
+
+    i_sine_term = tf.reduce_prod( tf.sin( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+        tf.transpose(Xnew)[None, ...] # [1, D, N]
+    ) #[M, D, N]
+    ), axis = 1) #[M, N]
+    i_pre_multiplier = - _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
+
+    img_part  = i_pre_multiplier[..., None] * r_sine_term * i_sine_term # expected shape (M, N)
+
+    Kzf = tf.concat([real_part, img_part], axis = 0)
+
+    return Kzf
+
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)
 @check_shapes(
