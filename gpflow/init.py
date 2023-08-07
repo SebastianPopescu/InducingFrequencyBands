@@ -224,7 +224,7 @@ def neutral_initial_components(
     return means, bandwidths, powers
 
 
-def rbf_spectral_density(freq, lengthscale = 0.301, variance=1.):
+def rbf_spectral_density(freq, lengthscale = 0.101, variance=1.):
 
     constant_num = np.sqrt(np.sqrt(lengthscale)) / (2. * np.sqrt(np.pi))
     freq_term = np.exp(- np.sqrt(lengthscale) * freq**2 * 0.25)

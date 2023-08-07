@@ -16,6 +16,7 @@ import numpy as np  # pylint: disable=unused-import  # Used by Sphinx to generat
 import tensorflow as tf
 from check_shapes import check_shapes
 
+from ..config import default_float
 from ..base import TensorLike, TensorType
 from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
 from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, DecomposedMultipleSpectralBlock
@@ -108,64 +109,67 @@ def Kuf_asym_block_spectral_kernel_inducingpoints(
     _real_powers = kernel.real_powers # expected shape [M, ]
     _img_powers = kernel.img_powers # expected shape [M, ]
 
+    #################
     ### real part ###
+    #################
 
-    ### positive frequencies 
+    # positive frequencies 
 
-    r_sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
+    r_sine_term = tf.reduce_prod( tf.sin(tf.cast(np.pi, default_float()) * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
     
-    r_pos_cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+    r_pos_cosine_term = tf.reduce_prod( tf.cos(2. * tf.cast(np.pi, default_float()) * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
 
     r_pre_multiplier = _real_powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
+    r_pre_multiplier *= tf.cast(np.pi, default_float()) 
+    r_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
 
     pos_real_part  = r_pre_multiplier[..., None] * r_sine_term * r_pos_cosine_term # expected shape (M, N)
 
-    ### negative frequencies
+    # negative frequencies
 
-    r_neg_cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(-_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
+    #r_neg_cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(-_means)[..., None], # [M, D, 1]
+    #    tf.transpose(Xnew)[None, ...] # [1, D, N]
+    #) #[M, D, N]
+    #), axis = 1) #[M, N]
 
-    pre_multiplier = _real_powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
+    #neg_real_part  = r_pre_multiplier[..., None] * r_sine_term * r_neg_cosine_term # expected shape (M, N)
 
-    neg_real_part  = pre_multiplier[..., None] * r_sine_term * r_neg_cosine_term # expected shape (M, N)
+    #real_part = tf.concat([pos_real_part, neg_real_part], axis = 0)
+    #print('-- inside Kuf ---')
+    #print(tf.shape(real_part))
 
-    real_part = tf.concat([pos_real_part, neg_real_part], axis = 0)
-
-    print('-- inside Kuf ---')
-    print(tf.shape(real_part))
-
+    ######################
     ### imaginary part ###
+    ######################
 
-    ### positive frequencies 
+    # positive frequencies 
 
-    i_pos_sine_term = tf.reduce_prod( tf.sin( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+    i_pos_sine_term = tf.reduce_prod( tf.sin( 2. * tf.cast(np.pi, default_float()) * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
 
-    pos_img_part  = pre_multiplier[..., None] * r_sine_term * i_pos_sine_term # expected shape (M, N)
+    pos_img_part  = r_pre_multiplier[..., None] * r_sine_term * i_pos_sine_term # expected shape (M, N)
 
-    ### negative frequencies
+    # negative frequencies
 
-    i_neg_sine_term = tf.reduce_prod( tf.sin( tf.multiply(tf.transpose(-_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
+    #i_neg_sine_term = tf.reduce_prod( tf.sin( tf.multiply(tf.transpose(-_means)[..., None], # [M, D, 1]
+    #    tf.transpose(Xnew)[None, ...] # [1, D, N]
+    #) #[M, D, N]
+    #), axis = 1) #[M, N]
 
-    neg_img_part  = pre_multiplier[..., None] * r_sine_term * i_neg_sine_term # expected shape (M, N)
+    #neg_img_part  = pre_multiplier[..., None] * r_sine_term * i_neg_sine_term # expected shape (M, N)
 
-    img_part = tf.concat([pos_img_part, neg_img_part], axis = 0)
-    print(tf.shape(img_part))
+    #img_part = tf.concat([pos_img_part, neg_img_part], axis = 0)
+    #print(tf.shape(img_part))
 
-    Kzf = tf.concat([real_part, img_part], axis = 0)
+    Kzf = tf.concat([pos_real_part, pos_img_part], axis = 0)
     print(tf.shape(Kzf))
     return Kzf
 
