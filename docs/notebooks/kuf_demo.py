@@ -131,9 +131,13 @@ print(bandwidths_np.shape)
 
 powers_np = [np.float64(np_float) for np_float in powers_np]
 
-kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
-    bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
-ind_pts = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kern)
+kern = gpflow.kernels.DecomposedMultipleSpectralBlock(n_components=N_COMPONENTS, 
+                                                          means= means_np, 
+                                                          bandwidths= bandwidths_np, 
+                                                          real_powers= powers_np, 
+                                                          img_powers = powers_np,
+                                                          alpha=ALPHA)
+ind_pts = gpflow.inducing_variables.AsymRectangularSpectralInducingPoints(kern = kern)
 
 #FIXME -- it can't find the signature 
 #_Kuf = covariances.Kuf(inducing_variable = ind_pts, kernel = kern, Xnew = X)

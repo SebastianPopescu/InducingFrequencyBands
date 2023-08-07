@@ -80,7 +80,7 @@ MAXFREQ = 10.
 if KERNEL =='cosine':
     N_COMPONENTS = 1
 else:
-    N_COMPONENTS = 50
+    N_COMPONENTS = 25
 MAXITER = 1000
 
 # %% [markdown]
@@ -90,7 +90,7 @@ INIT_METHOD = 'rbf'
 #INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-24
+ALPHA = 1e-12
 
 if KERNEL == 'cosine':
     #NOTE -- these will just be used as dummy variables in this initaliation
@@ -160,10 +160,15 @@ print(powers_np)
 
 if KERNEL=='cosine':
     kern = gpflow.kernels.SpectralDiracDeltaBlock(means= means_np, 
-    bandwidths= bandwidths_np, powers=powers_np, alpha = 0.)
+                                                  bandwidths= bandwidths_np, 
+                                                  powers=powers_np, 
+                                                  alpha = 0.)
 elif KERNEL=='multisinc':
-    kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, means= means_np, 
-        bandwidths= bandwidths_np, powers=powers_np, alpha=ALPHA)
+    kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, 
+                                                means= means_np, 
+                                                bandwidths= bandwidths_np, 
+                                                powers=powers_np, 
+                                                alpha=ALPHA)
 elif KERNEL=='decomposed_multisinc':
     kern = gpflow.kernels.DecomposedMultipleSpectralBlock(n_components=N_COMPONENTS, 
                                                           means= means_np, 
