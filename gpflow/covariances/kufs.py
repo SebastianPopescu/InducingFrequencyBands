@@ -136,7 +136,7 @@ def Kuf_asym_block_spectral_kernel_inducingpoints(
     # inducing points to be pre-multiplied by $\sqrt(\alpha)$
     # in their definition.
 
-    #r_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
+    r_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
 
     pos_real_part  = r_pre_multiplier[..., None] * r_sine_term * r_pos_cosine_term # expected shape (M, N)
 
@@ -157,6 +157,11 @@ def Kuf_asym_block_spectral_kernel_inducingpoints(
     i_pre_multiplier = _img_powers * tf.reduce_prod(
         tf.math.reciprocal(2. * _bandwidths), axis = 0) # expected shape (M, )
     i_pre_multiplier *= tf.cast(np.pi, default_float()) 
+    #NOTE -- this is not used here as we are assuming the inter-domain
+    # inducing points to be pre-multiplied by $\sqrt(\alpha)$
+    # in their definition.
+
+    i_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
 
     i_pos_sine_term = tf.reduce_prod( tf.sin( 2. * tf.cast(np.pi, default_float())
                                              * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]

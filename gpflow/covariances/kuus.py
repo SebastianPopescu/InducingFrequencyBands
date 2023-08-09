@@ -173,8 +173,12 @@ def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
 
     num_approx_N = 1000
 
-    Kzz = tf.linalg.diag( tf.cast(np.pi, default_float()) * powers 
-                         / (2. * kernel.bandwidths))
+    #NOTE -- this is the case where we pre-multiply the inter-domain
+    # inducing points with $\sqrt{\alpha}$ in the definition.
+    #Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
+    #                     / (2. * kernel.bandwidths))
+    Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
+                         / (2. * kernel.bandwidths * kernel.alpha))
 
     lower_limit = means - 0.5 * kernel.bandwidths
     upper_limit = means + 0.5 * kernel.bandwidths
