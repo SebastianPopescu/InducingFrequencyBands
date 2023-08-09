@@ -110,4 +110,6 @@ class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBas
         "return: []",
     )
     def num_inducing(self) -> Optional[tf.Tensor]:
-        return self.kern.n_components * 2
+        #NOTE -- this is the case when we only consider positive frequencies
+        #return self.kern.n_components * 2
+        return self.kern.n_components * 4

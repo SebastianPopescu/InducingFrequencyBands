@@ -85,7 +85,8 @@ def midpoint_rule(x, std, a, b, n, Burmann_series, alpha):
                                                                default_float())*std))
 
     # Calculate the approximate integral using the midpoint rule formula
-    integral_approx = _pre * h * tf.reduce_sum(f_midpoints)
+    integral_approx = h * tf.reduce_sum(f_midpoints)
+    #integral_approx *= _pre
     
     return integral_approx
 
@@ -172,7 +173,8 @@ def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
 
     num_approx_N = 1000
 
-    Kzz = tf.linalg.diag(powers / (2. * kernel.bandwidths))
+    Kzz = tf.linalg.diag( tf.cast(np.pi, default_float()) * powers 
+                         / (2. * kernel.bandwidths))
 
     lower_limit = means - 0.5 * kernel.bandwidths
     upper_limit = means + 0.5 * kernel.bandwidths
@@ -230,26 +232,20 @@ def Kuu_asym_block_multi_spectral_kernel_inducingpoints(
     # Real features corresponding to the cosine transform
     r_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
         inducing_variable, kernel, kernel.means, kernel.real_powers)
-    #r_Kzz_negative_freq = Kuu_single_block_multi_spectral_kernel_inducingpoints(
-    #    inducing_variable, kernel, -kernel.means, kernel.real_powers)
-
-    print('--- inside Kuu ---')
-    print(tf.shape(r_Kzz_positive_freq))
-    #print(tf.shape(r_Kzz_negative_freq))
+    r_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, -kernel.means, kernel.real_powers)
 
     #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
-    #r_Kzz = BlockDiagMat(r_Kzz_positive_freq, r_Kzz_negative_freq)
+    r_Kzz = BlockDiagMat(r_Kzz_positive_freq, r_Kzz_negative_freq)
     
     # Real features corresponding to the sine transform
     i_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
         inducing_variable, kernel, kernel.means, kernel.img_powers)
-    #i_Kzz_negative_freq = Kuu_single_block_multi_spectral_kernel_inducingpoints(
-    #    inducing_variable, kernel, -kernel.means, kernel.img_powers)
-    print(tf.shape(i_Kzz_positive_freq))
-    #print(tf.shape(i_Kzz_negative_freq))
+    i_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, -kernel.means, kernel.img_powers)
 
     #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
-    #i_Kzz = BlockDiagMat(i_Kzz_positive_freq, i_Kzz_negative_freq)
+    i_Kzz = BlockDiagMat(i_Kzz_positive_freq, i_Kzz_negative_freq)
 
     #NOTE -- I have to be careful in Kuf to maintain the real, imaginary features ordering
 
@@ -257,8 +253,12 @@ def Kuu_asym_block_multi_spectral_kernel_inducingpoints(
     #r_Kzz = BlockDiagMat(tf.linalg.diag(kernel.real_powers), tf.linalg.diag(kernel.real_powers))
     #i_Kzz = BlockDiagMat(tf.linalg.diag(kernel.img_powers), tf.linalg.diag(kernel.img_powers))
     
-    return BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
-
+    #NOTE -- this is the version just with positive frequencies
+    #return BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
+    
+    Kzz = BlockDiagMat(r_Kzz, i_Kzz)
+    
+    return Kzz
 
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(
