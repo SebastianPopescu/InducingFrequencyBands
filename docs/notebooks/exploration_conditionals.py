@@ -150,13 +150,14 @@ print('bandwidths_np')
 print(bandwidths_np)
 print(bandwidths_np.shape)
 if KERNEL=='decomposed_multisinc':
+    #NOTE -- we are just splitting in half the powers of each block
+    # and assign them to the co/sine rectangular blocks.
     powers_np = [np.float64(np_float/2.) for np_float in powers_np]
 else:
     powers_np = [np.float64(np_float) for np_float in powers_np]
 
 print('powers_np')
 print(powers_np)
-
 
 if KERNEL=='cosine':
     kern = gpflow.kernels.SpectralDiracDeltaBlock(means= means_np, 
