@@ -58,7 +58,6 @@ def Kuf_L2_features_spectral_kernel_inducingpoints(
     inducing_variable: SpectralInducingVariables, kernel: L2_Matern12, Xnew: TensorType
 ) -> tf.Tensor:
 
-    print('--- inside Kuf ---')
     lamb = 1.0 / kernel.lengthscales
     
     omegas = inducing_variable.omegas # shape - [M, ]   
@@ -68,22 +67,18 @@ def Kuf_L2_features_spectral_kernel_inducingpoints(
     
     #NOTE -- corresponds to real part of equation 46 from VFF paper.
     real_part = spectrum * tf.math.cos(omegas * (Xnew - a))
-    real_part += spectrum * tf.math.reciprocal(2. * lamb) * (lamb * ( tf.math.exp(a - Xnew) 
+    real_part += spectrum * tf.math.reciprocal(2. * lamb) * (lamb * (- tf.math.exp(a - Xnew) 
                                                                      - tf.math.exp(Xnew - b) ))
-    print('real part')
-    print(real_part)
 
     #NOTE -- corresponds to imaginary part of equation 46 from VFF paper.
     #NOTE -- we don't want to use zero freq for sine features
     imaginary_part = spectrum[omegas != 0] * tf.math.sin(omegas[omegas != 0] * (Xnew - a))
     imaginary_part += spectrum[omegas != 0]  * tf.math.reciprocal(2. * lamb) * spectrum[omegas != 0] * (tf.math.exp(a - Xnew) 
                                                                               - tf.math.exp(Xnew - b))
-    print('im part')
-    print(imaginary_part)
+
     _Kuf = tf.concat([real_part, imaginary_part], 1) 
-    print('Kuf')
-    print(_Kuf)
-    #FIXME -- why are we getting the transpsoe?
+
+    #FIXME -- why are we getting the transpose? I don't think it matters that much in the end.
     return tf.transpose(_Kuf) # shape - [2M - 1, N]
 
 

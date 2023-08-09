@@ -70,7 +70,7 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     """
     To be used for the L2 features case of VFF.
     """
-    print('---- inside Kuu ------')
+
     lamb = 1.0 / kernel.lengthscales
     a = inducing_variable.a 
     b = inducing_variable.b 
@@ -83,8 +83,6 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     Kzz_cosine *= 1. - tf.math.exp(lamb * (a-b)) # shape - [1,]
     Kzz_cosine /= tf.reshape(tf.square(lamb) + tf.square(omegas), [-1,1]) # shape - [M, 1]
     Kzz_cosine /= tf.reshape(tf.square(lamb) + tf.square(omegas), [1,-1]) # shape - [M, M]
-    print('cosine block')
-    print(Kzz_cosine)
 
     #addition of diagonal specific terms to cosine block
     # corresponds to equation 100 in VFF paper.
@@ -94,14 +92,13 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     # corresponds to equation 101 in VFF paper.
     scaling_list = [2.]
     upto = tf.shape(omegas)[0] - 1
-    #.TODO -- this causes an error when trying to train this model. Probably due to some tf.function mechanics
+    #TODO -- this causes an error when trying to train this model. 
+    # Probably due to some tf.function underlying mechanics
     scaling_list.extend([1. for _ in range(upto)])
     #FIXME -- tmp workaround
     Kzz_cosine += tf.cast(tf.linalg.diag(diagonal_cosine), default_float()) * tf.cast(
         tf.linalg.diag(scaling_list), default_float()) #  shape - [M,M]
     #Kzz_cosine += tf.cast(tf.linalg.diag(diagonal_cosine), default_float())
-    print('cosine block')
-    print(Kzz_cosine)
 
     #sine block - corresponds to equation 105 in VFF paper.
     #NOTE -- we don't want to use zero freq for sine features
@@ -110,8 +107,6 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     Kzz_sine *= 1. - tf.math.exp(lamb * (a-b))
     Kzz_sine /= tf.square(lamb) + tf.square(tf.reshape(omegas[omegas != 0], [-1,1]))
     Kzz_sine /= tf.square(lamb) + tf.square(tf.reshape(omegas[omegas != 0], [1,-1]))
-    print('sine block')
-    print(Kzz_sine)
 
     #addition of diagonal specific terms to sine block - corresponds to equation 106 in VFF paper.
     diagonal_sine = (b - a) * lamb 
@@ -119,12 +114,8 @@ def Kuu_L2_features_spectral_kernel_inducingpoints(
     Kzz_sine += tf.linalg.diag(diagonal_sine) #  shape - [M-1, M-1]
     print('sine block')
     print(Kzz_sine)
-    #operator = tf.linalg.LinearOperatorBlockDiag([tf.linalg.LinearOperatorFullMatrix(Kzz_cosine), 
-    #                                              tf.linalg.LinearOperatorFullMatrix(Kzz_sine)])
-    #Kzz = operator.to_dense() # shape - [2M-1, 2M-1]
+
     Kzz = BlockDiagMat(Kzz_cosine, Kzz_sine)    
-    print('Kzz')
-    print(Kzz)
 
     #NOTE -- doesn't seem to help that much
     #Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
@@ -138,14 +129,13 @@ def Kuu_RKHS_features_spectral_kernel_inducingpoints(
 ) -> tf.Tensor:
     
     """
-    To be used for the rkhs features case of VFF.
+    To be used for the RKHS features case of VFF.
     """
 
     lamb = 1.0 / kernel.lengthscales
     a = inducing_variable.a 
     b = inducing_variable.b 
-    omegas = inducing_variable.omegas # shape - [M, ]   
-    #omegas = tf.reshape(omegas, [-1,1]) # shape - [M, 1]   
+    omegas = inducing_variable.omegas # shape - [M, ]    
     #spectrum = inducing_variable.spectrum(kernel) # shape - [M, ] 
 
     # cos part first
