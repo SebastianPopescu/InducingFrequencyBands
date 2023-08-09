@@ -80,7 +80,7 @@ MAXFREQ = 10.
 if KERNEL =='cosine':
     N_COMPONENTS = 1
 else:
-    N_COMPONENTS = 25
+    N_COMPONENTS = 500
 MAXITER = 1000
 
 # %% [markdown]
@@ -216,7 +216,7 @@ def plot_kernel_prediction(
         opt = gpflow.optimizers.Scipy()
         opt.minimize(model.training_loss, model.trainable_variables)
 
-    Xplot = np.linspace(-0.5, 1.5, 100)[:, None]
+    Xplot = np.linspace(-5.5, 5.5, 100)[:, None]
 
     if MODEL=='GPR':
         f_mean, f_var = model.predict_f(Xplot, full_cov=False)

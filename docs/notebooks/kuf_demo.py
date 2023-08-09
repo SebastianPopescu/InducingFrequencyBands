@@ -35,6 +35,7 @@ plt.ion()
 plt.close('all')
 plt.style.use("ggplot")
 
+from gpflow.config import default_float
 import gpflow
 from gpflow import covariances
 from gpflow.inducing_variables import SpectralInducingPoints
@@ -170,35 +171,55 @@ def Kuf_sym_block_spectral_kernel_inducingpoints(
 def Kuf_asym_block_spectral_kernel_inducingpoints(
     inducing_variable, kernel, Xnew):
 
+
+    """
+    Implies having inter-domain inducing points with just one rectangular 
+    function in their spectrum. In practice, we also use the symmetrical rectangular
+    function but as a different inter-domain inducing point.
+    """
+
     _means = kernel.means # expected shape [D, M]
     _bandwidths = kernel.bandwidths # expected shape [D, M]
-    _powers = kernel.powers # expected shape [M, ]
+    _real_powers = kernel.real_powers # expected shape [M, ]
+    _img_powers = kernel.img_powers # expected shape [M, ]
 
-    #real part
+    #################
+    ### real part ###
+    #################
 
-    r_sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
+    # positive frequencies 
+
+    r_sine_term = tf.reduce_prod( tf.sin(tf.cast(np.pi, default_float()) * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
     
-    r_cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+    r_pos_cosine_term = tf.reduce_prod( tf.cos(2. * tf.cast(np.pi, default_float()) * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
 
-    r_pre_multiplier = _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
+    r_pre_multiplier = _real_powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
+    r_pre_multiplier *= tf.cast(np.pi, default_float()) 
+    #r_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
 
-    real_part  = r_pre_multiplier[..., None] * r_sine_term * r_cosine_term # expected shape (M, N)
+    pos_real_part  = r_pre_multiplier[..., None] * r_sine_term * r_pos_cosine_term # expected shape (M, N)
 
-    i_sine_term = tf.reduce_prod( tf.sin( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+    ######################
+    ### imaginary part ###
+    ######################
+
+    # positive frequencies 
+
+    i_pos_sine_term = tf.reduce_prod( tf.sin( 2. * tf.cast(np.pi, default_float()) * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
         tf.transpose(Xnew)[None, ...] # [1, D, N]
     ) #[M, D, N]
     ), axis = 1) #[M, N]
-    i_pre_multiplier = - _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
 
-    img_part  = i_pre_multiplier[..., None] * r_sine_term * i_sine_term # expected shape (M, N)
+    pos_img_part  = r_pre_multiplier[..., None] * r_sine_term * i_pos_sine_term # expected shape (M, N)
 
-    return real_part, img_part
+    return pos_real_part, pos_img_part
+
 
 
 if BLOCKS == 'symmetrical_rec':
