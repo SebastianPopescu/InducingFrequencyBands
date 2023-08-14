@@ -63,17 +63,14 @@ def Kuu_block_spectral_kernel_inducingpoints(
 
 ####################################################
 ##Helper functions for approximating the real Kuu ##
-def midpoint_rule(x, std, a, b, n, Burmann_series, alpha):
+def midpoint_rule(x, std, a, b, n, Burmann_series):
 
     # Calculate the width of each subinterval
     h = (b - a) / n
     
-    #pre-multiplier
-    _pre = tf.square(tf.cast(np.pi, default_float())) / alpha
-
     # Calculate the midpoint values for each subinterval
     mean_midpoints = tf.linspace(a + h/2, b - h/2, n)
-    
+
     # Evaluate the function at the midpoint values
 
     if Burmann_series:
@@ -81,12 +78,13 @@ def midpoint_rule(x, std, a, b, n, Burmann_series, alpha):
         f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
     else:
         #NOTE -- this is using the default Tensorflow version
-        f_midpoints = tf.math.erf((x-mean_midpoints)/(tf.cast(tf.math.sqrt(2.),
-                                                               default_float())*std))
+        f_midpoints = 0.5*(1.0+tf.math.erf((x[tf.newaxis,...]-mean_midpoints)/(tf.cast(tf.math.sqrt(2.),
+                                                               default_float())*std)))
 
+    print('f_midpoints')
+    print(f_midpoints)
     # Calculate the approximate integral using the midpoint rule formula
-    integral_approx = h * tf.reduce_sum(f_midpoints)
-    #integral_approx *= _pre
+    integral_approx = h * tf.reduce_sum(f_midpoints, axis = 0)
     
     return integral_approx
 
@@ -144,14 +142,14 @@ def Kuu_single_block_symmetrical_multi_spectral_kernel_inducingpoints(
                                    tf.cast(np.pi, default_float()), 
                                    a = lower_limit, b = upper_limit, n = num_approx_N,
                                    Burmann_series=False,
-                                   alpha = kernel.alpha)
+                                   )
     
     num_int_approx -= midpoint_rule(lower_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
                                                                , default_float()) / 
                                     tf.cast(np.pi,default_float()), 
                                    a = lower_limit, b = upper_limit, n = num_approx_N,
                                    Burmann_series=False,
-                                   alpha = kernel.alpha)
+                                   )
     
     Kzz *= tf.linalg.diag(num_int_approx)
 
@@ -160,7 +158,7 @@ def Kuu_single_block_symmetrical_multi_spectral_kernel_inducingpoints(
 
 #NOTE -- this uses the Fourier cosine/sine transform of \exp^{\alpha x^{2}} so these 
 # results are only okay for the asymmetrical blocks case.
-def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
+def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
     inducing_variable, kernel, means, powers, *, jitter: float = 0.0):
     
     #NOTE -- this is the unwindowed case
@@ -172,13 +170,15 @@ def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
     #TODO -- do I need  to use tf.stop_gradients here?
 
     num_approx_N = 1000
+    
+    #NOTE -- original formulation
+    #Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
+    #                     / (2. * kernel.bandwidths * kernel.alpha))
 
     #NOTE -- this is the case where we pre-multiply the inter-domain
     # inducing points with $\sqrt{\alpha}$ in the definition.
-    #Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
-    #                     / (2. * kernel.bandwidths))
     Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
-                         / (2. * kernel.bandwidths * kernel.alpha))
+                         / (2. * kernel.bandwidths))
 
     lower_limit = means - 0.5 * kernel.bandwidths
     upper_limit = means + 0.5 * kernel.bandwidths
@@ -188,16 +188,97 @@ def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
                                    tf.cast(np.pi, default_float()), 
                                    a = lower_limit, b = upper_limit, n = num_approx_N,
                                    Burmann_series=False,
-                                   alpha = kernel.alpha)
+                                   )
     
     num_int_approx -= midpoint_rule(lower_limit, std = tf.cast(tf.math.sqrt(2.*kernel.alpha)
                                                                , default_float()) / 
                                     tf.cast(np.pi,default_float()), 
                                    a = lower_limit, b = upper_limit, n = num_approx_N,
                                    Burmann_series=False,
-                                   alpha = kernel.alpha)
+                                   )
     
     Kzz *= tf.linalg.diag(num_int_approx)
+
+    return tf.squeeze(Kzz, axis = 0)
+
+
+#helper function
+def update_off_diagonal(tensor, bandwidth_powers):
+    shape = tf.shape(tensor)
+    rows, cols = shape[0], shape[1]
+    
+    #get indces of elements
+    indices = tf.where(tf.ones_like(tensor, dtype=tf.bool))
+
+    #get the right spectral bandwidth for the combination of i,j in Kuu
+    desired_band = tf.cast(tf.reduce_sum(indices, axis = -1), tf.float32) * 0.5
+    desired_band = tf.cast(desired_band, tf.int32)
+
+    #TODO -- can this be vectorized?
+    updates = [bandwidth_powers[_] for _ in desired_band]
+    
+    # Update elements in even and odd positions of Kuu in the off-diagonal
+    # FIXME -- this should update just the off-diagonal elements only    
+    updated_tensor = tf.tensor_scatter_nd_update(tensor, indices, updates)
+
+    return updated_tensor
+
+#NOTE -- this uses the Fourier cosine/sine transform of \exp^{\alpha x^{2}} so these 
+# results are only okay for the asymmetrical blocks case.
+def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_full_version(
+    inducing_variable, kernel, means, powers, *, jitter: float = 0.0):
+    
+    """
+    Attempt at implementing a full Kuu matrix, with non-zero off-diagonals.
+    """
+
+    #NOTE -- this is the unwindowed case
+    #Kzz = tf.linalg.diag(kernel.powers)
+    #Kzz = tf.cast(Kzz, default_float())
+
+    #NOTE -- implements the following integral but approximated numerically
+    #NOTE -- erf is implemented via the second order Burmann series approximation
+    #TODO -- do I need  to use tf.stop_gradients here?
+
+    num_approx_N = 20
+
+    #NOTE -- this is the case where we pre-multiply the inter-domain
+    # inducing points with $\sqrt{\alpha}$ in the definition.
+    Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
+                         / (2. * kernel.bandwidths * kernel.alpha))
+    print('-- Kzz just diagonal ---')
+    print(Kzz)
+    Kzz = update_off_diagonal(Kzz, powers) * tf.square(tf.cast(np.pi, default_float())) / (2. * kernel.bandwidths * kernel.alpha)
+    print('--- Kzz after off-diagonal update ---')
+    print(Kzz)
+
+    lower_limit = means - 0.5 * kernel.bandwidths
+    upper_limit = means + 0.5 * kernel.bandwidths
+    
+    num_int_approx = midpoint_rule(tf.reshape(upper_limit,[-1,1]), std = tf.cast(tf.math.sqrt(2.*kernel.alpha)
+                                                              , default_float()) / 
+                                    tf.cast(np.pi, default_float()), 
+                                    a = tf.reshape(lower_limit, [1,-1]), b = tf.reshape(upper_limit, [1,-1]), 
+                                    n = num_approx_N,
+                                    Burmann_series=False,
+                                    )
+    print('---- first num_int_approx - -----')
+    print(num_int_approx)
+    
+    second_num_int_approx = midpoint_rule(tf.reshape(lower_limit,[-1,1]), std = tf.cast(tf.math.sqrt(2.*kernel.alpha)
+                                                               , default_float()) / 
+                                    tf.cast(np.pi,default_float()), 
+                                    a = tf.reshape(lower_limit, [1,-1]), b = tf.reshape(upper_limit, [1,-1]),
+                                    n = num_approx_N,
+                                    Burmann_series=False,
+                                    )
+    print('---- second num_int_approx - -----')
+    print(second_num_int_approx)
+    num_approx_N -= second_num_int_approx
+    #Kzz *= num_int_approx
+
+    print('---- Kzz  -----')
+    print(Kzz)
 
     return tf.squeeze(Kzz, axis = 0)
 
@@ -234,18 +315,18 @@ def Kuu_asym_block_multi_spectral_kernel_inducingpoints(
 ) -> tf.Tensor:
 
     # Real features corresponding to the cosine transform
-    r_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
+    r_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
         inducing_variable, kernel, kernel.means, kernel.real_powers)
-    r_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
+    r_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
         inducing_variable, kernel, -kernel.means, kernel.real_powers)
 
     #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
     r_Kzz = BlockDiagMat(r_Kzz_positive_freq, r_Kzz_negative_freq)
     
     # Real features corresponding to the sine transform
-    i_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
+    i_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
         inducing_variable, kernel, kernel.means, kernel.img_powers)
-    i_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints(
+    i_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
         inducing_variable, kernel, -kernel.means, kernel.img_powers)
 
     #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
@@ -261,7 +342,10 @@ def Kuu_asym_block_multi_spectral_kernel_inducingpoints(
     #return BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
     
     Kzz = BlockDiagMat(r_Kzz, i_Kzz)
-    
+    #Kzz = BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
+    print('---- Kzz ----')
+    print(Kzz)
+
     return Kzz
 
 @Kuu.register(Multiscale, SquaredExponential)

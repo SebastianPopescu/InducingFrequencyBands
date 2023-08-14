@@ -129,14 +129,13 @@ def Kuf_asym_block_spectral_kernel_inducingpoints(
     ) #[M, D, N]
     ), axis = 1) #[M, N]
 
+    #NOTE -- this is the case where we pre-multiply the inter-domain
+    # inducing points with $\sqrt{\alpha}$ in the definition.
     r_pre_multiplier = _real_powers * tf.reduce_prod(
         tf.math.reciprocal(2. * _bandwidths), axis = 0) # expected shape (M, )
     r_pre_multiplier *= tf.cast(np.pi, default_float()) 
-    #NOTE -- this is not used here as we are assuming the inter-domain
-    # inducing points to be pre-multiplied by $\sqrt(\alpha)$
-    # in their definition.
-
-    r_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
+    #NOTE -- uncomment this to retrive the original formulation of inter-domain inducing points
+    #r_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
 
     pos_real_part  = r_pre_multiplier[..., None] * r_sine_term * r_pos_cosine_term # expected shape (M, N)
 
@@ -154,14 +153,13 @@ def Kuf_asym_block_spectral_kernel_inducingpoints(
 
     ### positive frequencies 
 
+    #NOTE -- this is the case where we pre-multiply the inter-domain
+    # inducing points with $\sqrt{\alpha}$ in the definition.
     i_pre_multiplier = _img_powers * tf.reduce_prod(
         tf.math.reciprocal(2. * _bandwidths), axis = 0) # expected shape (M, )
     i_pre_multiplier *= tf.cast(np.pi, default_float()) 
-    #NOTE -- this is not used here as we are assuming the inter-domain
-    # inducing points to be pre-multiplied by $\sqrt(\alpha)$
-    # in their definition.
-
-    i_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
+    #NOTE -- uncomment this to retrive the original formulation of inter-domain inducing points
+    #i_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
 
     i_pos_sine_term = tf.reduce_prod( tf.sin( 2. * tf.cast(np.pi, default_float())
                                              * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
@@ -181,6 +179,7 @@ def Kuf_asym_block_spectral_kernel_inducingpoints(
     #NOTE -- this is the case when we are taking just the positive frequencies.
     #Kzf = tf.concat([pos_real_part, pos_img_part], axis = 0)
     Kzf = tf.concat([real_part, img_part], axis = 0)
+
 
     return Kzf
 
