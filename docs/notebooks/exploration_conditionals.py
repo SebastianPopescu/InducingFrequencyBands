@@ -80,7 +80,7 @@ MAXFREQ = 10.
 if KERNEL =='cosine':
     N_COMPONENTS = 1
 else:
-    N_COMPONENTS = 500
+    N_COMPONENTS = 10
 MAXITER = 1000
 
 # %% [markdown]
@@ -149,6 +149,14 @@ print(means_np.shape)
 print('bandwidths_np')
 print(bandwidths_np)
 print(bandwidths_np.shape)
+
+print('lower limits')
+print(means_np - bandwidths_np * 0.5)
+
+print('upper limits')
+print(means_np + bandwidths_np * 0.5)
+
+
 if KERNEL=='decomposed_multisinc':
     #NOTE -- we are just splitting in half the powers of each block
     # and assign them to the co/sine rectangular blocks.
