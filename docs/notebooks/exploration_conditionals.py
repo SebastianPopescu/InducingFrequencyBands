@@ -71,12 +71,14 @@ MODEL = 'SGPR'
 # # Can choose between 'multisinc' (i.e., corresponds to symmetrical rectangular blocks for both
 # # Inducing Frequency Bands and GP-MultiSinc), 'cosine' (i.e., dirac delta functions in the kernel spectrum)
 ## and Matern12 (i.e., corresponds to L2 features VFF)
-KERNEL = 'Matern12' #'multisinc' #'cosine'
+KERNEL = 'Matern12' 
+#KERNEL = 'multisinc' 
+#KERNEL ='cosine'
 MAXFREQ = 10.
 if KERNEL =='cosine':
     N_COMPONENTS = 1
 else:
-    N_COMPONENTS = 500
+    N_COMPONENTS = 50
 MAXITER = 1000
 
 # %% [markdown]
@@ -90,8 +92,8 @@ DELTAS = 1e-1
 ALPHA = 1e-24
 # %% [markdown]
 # # Can choose between 'RKHS', 'L2', ''. Only valid for Matern12 kernels within the VFF framework.
-FEATURES = 'L2' 
-#FEATURES = 'RKHS' 
+#FEATURES = 'L2' 
+FEATURES = 'RKHS' 
 #FEATURES = ''
 
 if KERNEL == 'cosine':
@@ -344,3 +346,53 @@ def plot_kernel(
 
 #TODO -- optimise = True seems to encounter numerical issues for L2 features VFF.
 plot_kernel(kern, optimise = False)
+
+
+
+def plot_covariance(kernel):
+    """
+    #TODO -- write documentation
+    """
+
+    if MODEL=='GPR':
+        model = gpflow.models.GPR(
+            (X_cond, Y_cond), kernel=deepcopy(kernel), noise_variance=1e-3
+        )
+    elif MODEL=='SGPR':
+        
+        if KERNEL=='Matern12':
+            ind_pts = SpectralInducingPoints(a = a, b = b, omegas = omegas)
+            model = gpflow.models.SGPR(
+                data = (X_cond, Y_cond), kernel=deepcopy(kernel), inducing_variable = ind_pts, noise_variance=1e-3
+            )
+
+        else:
+            ind_var = gpflow.inducing_variables.RectangularSpectralInducingPoints(kern = kernel)
+            model = gpflow.models.SGPR(
+                data = (X_cond, Y_cond), kernel=deepcopy(kernel), inducing_variable = ind_var, noise_variance=1e-3
+            )
+
+
+    _kuf, _kuu = model.get_covariances()
+
+    print(_kuf)
+    print(_kuu)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3, 10))
+
+    # Kuf
+    ax1.matshow(_kuf.numpy(), aspect="auto")
+    ax1.set_yticklabels([])
+    ax1.set_xticklabels([])
+    ax1.set_title("Kuf")
+
+    # Kuu
+    ax2.matshow(_kuu.numpy(), aspect="auto")
+    ax2.set_yticklabels([])
+    ax2.set_xticklabels([])
+    ax2.set_title("Kuu")
+
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{FEATURES}_{INIT_METHOD}_covariances.png')
+    plt.close()
+
+plot_covariance(kern)
