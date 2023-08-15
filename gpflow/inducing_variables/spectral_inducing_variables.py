@@ -103,6 +103,11 @@ class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBas
     where the powers of the individual sinc kernels stem from the summation of powers
     of the asymetrical rectangular blocks corresponding to the cosine and sine transform,
     respectively.
+
+    In this case we use the following Dirac Delta approximations to convolution operations:
+    - Kuu: Inner Convolution Operation
+    - Kuf: Inner Convolution Operation
+    
     """
 
     @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
@@ -114,6 +119,16 @@ class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBas
         #return self.kern.n_components * 2
         return self.kern.n_components * 4
     
+class AsymRectangularSpectralInducingPointsSimpleKuu(AsymRectangularSpectralInducingPoints):
+    """
+    Same as parent class.
+    
+    In this case we use the following Dirac Delta approximations to convolution operations:
+    - Kuu: Inner Convolution Operation & other Gaussian 
+    - Kuf: Inner Convolution Operation
+
+    """
+
 
 
 class AsymDiracSpectralInducingPoints(RectangularSpectralInducingPointsBase):
