@@ -443,6 +443,22 @@ class SGPR_deprecated(SGPRBase_deprecated):
 
         return mean, var
 
+    #FIXME -- make this work eventually
+    #@inherit_check_shapes
+    def get_covariances(
+        self, full_cov: bool = False, full_output_cov: bool = False
+    ):
+        """
+        #TODO -- update documentation
+        """
+
+        X_data, Y_data = self.data
+        kuf = Kuf(self.inducing_variable, self.kernel, X_data)
+        kuu = Kuu(self.inducing_variable, self.kernel, jitter=default_jitter())
+
+        return kuf, kuu
+
+
     @check_shapes(
         "return[0]: [M, P]",
         "return[1]: [M, M]",
