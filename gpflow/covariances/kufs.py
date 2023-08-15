@@ -18,8 +18,24 @@ from check_shapes import check_shapes
 
 from ..config import default_float
 from ..base import TensorLike, TensorType
-from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, DecomposedMultipleSpectralBlock
+from ..inducing_variables import (
+    InducingPatches, 
+    InducingPoints, 
+    Multiscale, 
+    SpectralInducingVariables, 
+    SymRectangularSpectralInducingPoints, 
+    AsymRectangularSpectralInducingPoints,
+    AsymDiracSpectralInducingPoints,
+)
+from ..kernels import (
+    Convolutional, 
+    Kernel, 
+    SquaredExponential, 
+    MultipleSpectralBlock, 
+    SpectralKernel, 
+    DecomposedMultipleSpectralBlock,
+    DecomposedMultipleDiracSpectralBlock
+)
 from .dispatch import Kuf
 
 
@@ -180,9 +196,97 @@ def Kuf_asym_block_spectral_kernel_inducingpoints(
     #Kzf = tf.concat([pos_real_part, pos_img_part], axis = 0)
     Kzf = tf.concat([real_part, img_part], axis = 0)
 
-
     return Kzf
 
+
+
+#TODO -- need to introduce these
+@Kuf.register(AsymDiracSpectralInducingPoints, DecomposedMultipleDiracSpectralBlock, TensorLike)
+#TODO -- re-introduce the check_shapes 
+#@check_shapes(
+#    "inducing_variable: [M, D, 1]",
+#    "Xnew: [batch..., N, D]",
+#    "return: [M, batch..., N]",
+#)
+def Kuf_asym_dirac_block_spectral_kernel_inducingpoints(
+    inducing_variable: AsymDiracSpectralInducingPoints, 
+    kernel: DecomposedMultipleDiracSpectralBlock, 
+    Xnew: TensorType
+) -> tf.Tensor:
+
+    """
+    Implies having inter-domain inducing points with just one rectangular 
+    function in their spectrum. In practice, we also use the symmetrical rectangular
+    function but as a different inter-domain inducing point.
+    """
+
+    _means = kernel.means # expected shape [D, M]
+    _bandwidths = kernel.bandwidths # expected shape [D, M]
+    _real_powers = kernel.real_powers # expected shape [M, ]
+    _img_powers = kernel.img_powers # expected shape [M, ]
+
+    #################
+    ### real part ###
+    #################
+
+    ### positive frequencies 
+
+    r_pos_cosine_term = tf.cos(2. * tf.cast(np.pi, default_float()) * 
+                               tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+                                           tf.transpose(Xnew)[None, ...] # [1, D, N]
+                                )) #[M, D, N] -- in this case D=1
+
+    r_pos_cosine_term = tf.transpose(r_pos_cosine_term, [1,0,2]) #[D, M, N] -- in this case D=1
+
+    sq_diff = tf.square(tf.reshape(_means, [-1, 1]) - tf.reshape(_means, [1, -1])) # [M, M]
+
+    exp1 = tf.math.exp(tf.cast(-tf.math.reciprocal(4. * kernel.alpha), default_float())
+                        * tf.cast(sq_diff, default_float()))
+    exp1 = exp1[..., tf.newaxis] # [M, M, 1]
+
+    _real_powers = tf.reshape(_real_powers, [-1, 1, 1]) # [M, 1, 1]   
+
+    pos_real_part = _real_powers * 0.5 * r_pos_cosine_term * exp1 # [M, M, N]
+    pos_real_part = tf.reduce_sum(pos_real_part, axis = 0) # [M, N]
+
+    _pre_multiplier = tf.sqrt(tf.cast(np.pi, default_float()))
+    _pre_multiplier /= (2. * kernel.alpha)
+
+    pos_real_part *= _pre_multiplier
+
+    ### negative frequencies
+    # NOTE -- I think in this case both are equal
+    #real_part = tf.concat([pos_real_part, pos_real_part], axis = 0)
+
+
+    ######################
+    ### imaginary part ###
+    ######################
+
+    ### positive frequencies 
+
+    r_pos_sine_term = tf.sin(2. * tf.cast(np.pi, default_float()) * 
+                               tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
+                                           tf.transpose(Xnew)[None, ...] # [1, D, N]
+                                )) #[M, D, N] -- in this case D=1
+    r_pos_sine_term = tf.transpose(r_pos_sine_term, [1,0,2]) #[D, M, N] -- in this case D=1
+
+    _img_powers = tf.reshape(_img_powers, [-1, 1, 1]) # [M, 1, 1]   
+    pos_img_part = _img_powers * 0.5 * r_pos_sine_term * exp1 # [M, M, N]
+    pos_img_part = tf.reduce_sum(pos_img_part, axis = 0) # [M, N]
+    pos_img_part *= _pre_multiplier
+
+    ### negative frequencies
+    #NOTE -- I think in this case it's just the negative
+    #img_part = tf.concat([pos_img_part, -pos_img_part], axis = 0)
+
+    #NOTE -- this is the case when we are taking just the positive frequencies.
+    Kzf = tf.concat([pos_real_part, pos_img_part], axis = 0)
+    #Kzf = tf.concat([real_part, img_part], axis = 0)
+    print('Kzf')
+    print(tf.shape(Kzf))
+
+    return Kzf
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)
 @check_shapes(

@@ -17,8 +17,24 @@ import numpy as np
 from check_shapes import check_shapes
 
 from ..config import default_float
-from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, DecomposedMultipleSpectralBlock
+from ..inducing_variables import (
+    InducingPatches, 
+    InducingPoints, 
+    Multiscale, 
+    SpectralInducingVariables, 
+    SymRectangularSpectralInducingPoints, 
+    AsymRectangularSpectralInducingPoints,
+    AsymDiracSpectralInducingPoints,
+)
+from ..kernels import (
+    Convolutional, 
+    Kernel, 
+    SquaredExponential, 
+    MultipleSpectralBlock, 
+    SpectralKernel, 
+    DecomposedMultipleSpectralBlock, 
+    DecomposedMultipleDiracSpectralBlock,
+)
 from .dispatch import Kuu
 
 
@@ -61,8 +77,8 @@ def Kuu_block_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-####################################################
-##Helper functions for approximating the real Kuu ##
+#####################################################
+##Helper functions for approximating the real Kuu ###
 def midpoint_rule(x, std, a, b, n, Burmann_series):
 
     # Calculate the width of each subinterval
@@ -343,8 +359,79 @@ def Kuu_asym_block_multi_spectral_kernel_inducingpoints(
     
     Kzz = BlockDiagMat(r_Kzz, i_Kzz)
     #Kzz = BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
-    print('---- Kzz ----')
-    print(Kzz)
+
+    return Kzz
+
+def Kuu_single_block_asymmetrical_multi_dirac_spectral_kernel_inducingpoints(
+    inducing_variable, kernel, means, powers, *, jitter: float = 0.0):
+    
+    """
+    Attempt at implementing a full Kuu matrix, with non-zero off-diagonals
+    in the case of Dirac delta spectral bands.
+    """
+
+    #FIXME -- solve this tf.cast
+    exp1 = tf.math.exp(-tf.cast(tf.math.reciprocal(4.0 * kernel.alpha), default_float()) * 
+                       tf.square(tf.reshape(means, [-1, 1]) - 
+                                 tf.reshape(means, [1, -1]) 
+                                 )) # [M, M]
+    
+    sq_diff = tf.square((tf.reshape(means, [-1, 1])[tf.newaxis, ...] + 
+                         tf.reshape(means, [1, -1])[tf.newaxis, ...] )* 0.5 - 
+                         tf.reshape(means, [-1, 1, 1])) # [M, M, M]
+
+    _powers = tf.reshape(powers, [-1, 1, 1]) # [M, 1, 1]                                 
+
+    #FIXME -- solve this extra tf.cast 
+    exp2 =  tf.reduce_sum(_powers * 0.5 * tf.math.exp(-tf.cast(tf.math.reciprocal(4. * kernel.alpha), 
+                                                         default_float()) * sq_diff
+                                                         ), axis = 0) # [M, M]
+
+    _pre_multiplier = tf.cast(np.pi, default_float())
+    _pre_multiplier /= (4. * kernel.alpha**2)
+
+    Kzz = _pre_multiplier * exp1 * exp2
+
+    return Kzz
+
+
+@Kuu.register(AsymDiracSpectralInducingPoints, DecomposedMultipleDiracSpectralBlock)
+def Kuu_asym_dirac_block_multi_spectral_kernel_inducingpoints(
+    inducing_variable: AsymDiracSpectralInducingPoints, kernel: DecomposedMultipleDiracSpectralBlock, *, jitter: float = 0.0
+) -> tf.Tensor:
+
+    # Real features corresponding to the cosine transform
+    r_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_dirac_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, kernel.means, kernel.real_powers)
+    r_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_dirac_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, -kernel.means, kernel.real_powers)
+
+    #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
+    r_Kzz = BlockDiagMat(r_Kzz_positive_freq, r_Kzz_negative_freq)
+    
+    # Real features corresponding to the sine transform
+    i_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_dirac_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, kernel.means, kernel.img_powers)
+    i_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_dirac_spectral_kernel_inducingpoints(
+        inducing_variable, kernel, -kernel.means, kernel.img_powers)
+
+    #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
+    i_Kzz = BlockDiagMat(i_Kzz_positive_freq, i_Kzz_negative_freq)
+
+    #NOTE -- I have to be careful in Kuf to maintain the real, imaginary features ordering
+
+    #NOTE -- this is the unwindowed case
+    #r_Kzz = BlockDiagMat(tf.linalg.diag(kernel.real_powers), tf.linalg.diag(kernel.real_powers))
+    #i_Kzz = BlockDiagMat(tf.linalg.diag(kernel.img_powers), tf.linalg.diag(kernel.img_powers))
+    
+    #NOTE -- this is the version just with positive frequencies
+    #return BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
+    
+    #Kzz = BlockDiagMat(r_Kzz, i_Kzz)
+    Kzz = BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
+
+    print('Kzz')
+    print(tf.shape(Kzz))
 
     return Kzz
 

@@ -100,7 +100,7 @@ class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBas
     """
     Real-space (in output space) "spectral" inter-domain inducing points with a PSD 
     given by asymmetrical rectangles. Corresponding kernel is the multi sinc kernel,
-    where the powers of the individiaul sinc kernels stem from the summation of powers
+    where the powers of the individual sinc kernels stem from the summation of powers
     of the asymetrical rectangular blocks corresponding to the cosine and sine transform,
     respectively.
     """
@@ -113,3 +113,24 @@ class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBas
         #NOTE -- this is the case when we only consider positive frequencies
         #return self.kern.n_components * 2
         return self.kern.n_components * 4
+    
+
+
+class AsymDiracSpectralInducingPoints(RectangularSpectralInducingPointsBase):
+    """
+    Real-space (in output space) ``spectral'' inter-domain inducing points with a PSD 
+    given by asymmetrical rectangles, which in this case are taken to be Dirac centred. 
+    Corresponding kernel is a multi cosine kernel,
+    where the powers of the individual cosine kernels stem from the summation of powers
+    of the asymetrical rectangular blocks corresponding to the cosine and sine transform,
+    respectively.
+    """
+
+    @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
+    @check_shapes(
+        "return: []",
+    )
+    def num_inducing(self) -> Optional[tf.Tensor]:
+        #NOTE -- this is the case when we only consider positive frequencies
+        #return self.kern.n_components * 2
+        return self.kern.n_components * 2

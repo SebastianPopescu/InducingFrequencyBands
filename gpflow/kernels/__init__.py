@@ -49,6 +49,7 @@ from .stationaries import (  # isort:skip
 from .spectral import (
     MultipleSpectralBlock, 
     DecomposedMultipleSpectralBlock,
+    DecomposedMultipleDiracSpectralBlock,
     SpectralBlock, 
     MixtureSpectralGaussian,
     SpectralDiracDeltaBlock
@@ -119,4 +120,5 @@ __all__ = [
     "SpectralSum",
     "SpectralProduct",
     "SpectralDiracDeltaBlock",
+    "DecomposedMultipleDiracSpectralBlock",
 ]
