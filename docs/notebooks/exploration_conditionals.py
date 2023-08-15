@@ -71,11 +71,14 @@ MODEL = 'SGPR'
 # # Can choose between 'multisinc' (i.e., corresponds to symmetrical rectangular blocks for both
 # # Inducing Frequency Bands and GP-MultiSinc), 'cosine' (i.e., dirac delta functions in the kernel spectrum)
 # # ,'decomposed_multisinc' (i.e., corresponds to asymmetrical rectangular blocks for
-# # Inducing Frequency Bands, which essentially translates to cosine and sine transforms as the features) and
+# # Inducing Frequency Bands, which essentially translates to cosine and sine transforms as the features),
 # # 'decomposed_dirac_multisinc' (i.e, corresponds to asymmetrical rectangular blocks which happen to be
-# # Dirac Delta) that correspond to multi cosine kernels.
-KERNEL = 'decomposed_dirac_multisinc'
+# # Dirac Delta) that correspond to multi cosine kernels, 'decomposed_multisinc_simple_kuu' (i.e., similar
+# # to 'decomposed_multisinc' with the exception that in Kuu we use two Dirac delta approximations,
+# # thereby obtaining a simpler formula for Kuu.)
+#KERNEL = 'decomposed_dirac_multisinc'
 #KERNEL = 'decomposed_multisinc'
+KERNEL = 'decomposed_multisinc_simple_kuu'
 #KERNEL = 'multisinc' 
 #KERNEL = 'cosine'
 
@@ -93,7 +96,7 @@ INIT_METHOD = 'rbf'
 #INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-1
+ALPHA = 1e-12
 
 if KERNEL == 'cosine':
     #NOTE -- these will just be used as dummy variables in this initaliation
@@ -160,7 +163,7 @@ print('upper limits')
 print(means_np + bandwidths_np * 0.5)
 
 
-if KERNEL=='decomposed_multisinc' or KERNEL=='decomposed_dirac_multisinc':
+if KERNEL=='decomposed_multisinc' or KERNEL=='decomposed_dirac_multisinc' or KERNEL=='decomposed_multisinc_simple_kuu':
     #NOTE -- we are just splitting in half the powers of each block
     # and assign them to the co/sine rectangular blocks.
     powers_np = [np.float64(np_float/2.) for np_float in powers_np]
@@ -182,6 +185,13 @@ elif KERNEL=='multisinc':
                                                 powers=powers_np, 
                                                 alpha=ALPHA)
 elif KERNEL=='decomposed_multisinc':
+    kern = gpflow.kernels.DecomposedMultipleSpectralBlock(n_components=N_COMPONENTS, 
+                                                          means= means_np, 
+                                                          bandwidths= bandwidths_np, 
+                                                          real_powers= powers_np, 
+                                                          img_powers = powers_np,
+                                                          alpha=ALPHA)
+elif KERNEL=='decomposed_multisinc_simple_kuu':
     kern = gpflow.kernels.DecomposedMultipleSpectralBlock(n_components=N_COMPONENTS, 
                                                           means= means_np, 
                                                           bandwidths= bandwidths_np, 
@@ -226,6 +236,8 @@ def plot_kernel_prediction(
             ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kernel)
         elif KERNEL=='decomposed_multisinc':
             ind_var = gpflow.inducing_variables.AsymRectangularSpectralInducingPoints(kern = kernel)
+        elif KERNEL=='decomposed_multisinc_simple_kuu':
+            ind_var = gpflow.inducing_variables.AsymRectangularSpectralInducingPointsSimpleKuu(kern = kernel)
         elif KERNEL=='decomposed_dirac_multisinc':
             ind_var = gpflow.inducing_variables.AsymDiracSpectralInducingPoints(kern = kernel)
         model = gpflow.models.SGPR(
@@ -299,7 +311,7 @@ def plot_spectrum_blocks(
         #ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), 
         #        label='$S_{aa}(\\nu)$', linewidth=.8)
 
-        if KERNEL=='decomposed_multisinc' or KERNEL=='decomposed_dirac_multisinc':
+        if KERNEL=='decomposed_multisinc' or KERNEL=='decomposed_dirac_multisinc' or KERNEL=='decomposed_multisinc_simple_kuu':
             _kernel_powers = kern.real_powers[_] + kern.img_powers[_]
         else:
             _kernel_powers = kern.powers[_]
@@ -349,6 +361,8 @@ def plot_covariance(kernel):
             ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kernel)
         elif KERNEL=='decomposed_multisinc':
             ind_var = gpflow.inducing_variables.AsymRectangularSpectralInducingPoints(kern = kernel)
+        elif KERNEL=='decomposed_multisinc_simple_kuu':
+            ind_var = gpflow.inducing_variables.AsymRectangularSpectralInducingPointsSimpleKuu(kern = kernel)
         elif KERNEL=='decomposed_dirac_multisinc':
             ind_var = gpflow.inducing_variables.AsymDiracSpectralInducingPoints(kern = kernel)
         model = gpflow.models.SGPR(
