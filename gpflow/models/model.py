@@ -83,6 +83,24 @@ class TimeSpectrumBayesianModel(Module, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
+class TimeSpectrumGPModel(TimeSpectrumBayesianModel):
+    def __init__(
+        self,
+        kernel: Kernel,
+        likelihood: Likelihood,
+        mean_function: Optional[MeanFunction] = None,
+        num_latent_gps: Optional[int] = None,
+    ):
+        super().__init__()
+        assert num_latent_gps is not None, "GPModel requires specification of num_latent_gps"
+        self.num_latent_gps = num_latent_gps
+        if mean_function is None:
+            mean_function = Zero()
+        self.mean_function = mean_function
+        self.kernel = kernel
+        self.likelihood = likelihood
+
+
 
 class BayesianModel(Module, metaclass=abc.ABCMeta):
     """Bayesian model.

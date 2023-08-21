@@ -51,7 +51,8 @@ from .spectral import (
     DecomposedMultipleSpectralBlock,
     SpectralBlock, 
     MixtureSpectralGaussian,
-    SpectralDiracDeltaBlock
+    SpectralDiracDeltaBlock,
+    MixtureSpectralGaussianVectorized
 )
 
 from .spectral_stationaries import (
@@ -119,4 +120,5 @@ __all__ = [
     "SpectralSum",
     "SpectralProduct",
     "SpectralDiracDeltaBlock",
+    "MixtureSpectralGaussianVectorized",
 ]
