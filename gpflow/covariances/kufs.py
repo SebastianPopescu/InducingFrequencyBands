@@ -18,8 +18,8 @@ from check_shapes import check_shapes
 
 from ..config import default_float
 from ..base import TensorLike, TensorType
-from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, DecomposedMultipleSpectralBlock
+from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SymRectangularSpectralInducingPoints 
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, MixtureSpectralGaussianVectorized
 from .dispatch import Kuf
 
 
@@ -48,140 +48,73 @@ def Kuf_spectral_kernel_inducingpoints(
 
     return Kzf
 
-
-@Kuf.register(SymRectangularSpectralInducingPoints, MultipleSpectralBlock, TensorLike)
-#TODO -- re-introduce the check_shapes 
-#@check_shapes(
-#    "inducing_variable: [M, D, 1]",
-#    "Xnew: [batch..., N, D]",
-#    "return: [M, batch..., N]",
-#)
-def Kuf_sym_block_spectral_kernel_inducingpoints(
-    inducing_variable: SymRectangularSpectralInducingPoints, kernel: MultipleSpectralBlock, 
-    Xnew: TensorType
+@Kuf.register(SymRectangularSpectralInducingPoints, MixtureSpectralGaussianVectorized, TensorLike)
+def Kuf_windowed_mixture_gaussian_spectral_kernel_inducingpoints(
+    inducing_variable: SymRectangularSpectralInducingPoints, kernel: MixtureSpectralGaussianVectorized, Xnew: TensorType
 ) -> tf.Tensor:
 
-    """
-    Implies having inter-domain inducing points with just symmetrical rectangular 
-    function in their spectrum. Results in the elimination of the imaginary component.
-    """
+    pos_freq_real, pos_freq_img = cross_covariance(inducing_variable.Z, Xnew, kernel.means, kernel)
+    neg_freq_real, neg_freq_img = cross_covariance(inducing_variable.Z, Xnew, -kernel.means, kernel)
 
-    _means = kernel.means # expected shape [D, M]
-    _bandwidths = kernel.bandwidths # expected shape [D, M]
-    _powers = kernel.powers # expected shape [M, ]
+    real_cov = 0.5*(pos_freq_real + neg_freq_real)
+    imag_cov = 0.5*(pos_freq_img + neg_freq_img)
 
-    sine_term = tf.reduce_prod( tf.sin(0.5 * tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
+    Kuf = tf.concat([real_cov, imag_cov], axis = 0)
+
+    return Kuf
+
+def cross_covariance(xi, t, theta, kernel):
+
+    r"""
+    Computes K_{Fy}\left( \xi, t^{*}\right),
+    which is the cross-covariance between the time-domain
+    and the frequency domain.
     
-    cosine_term = tf.reduce_prod( tf.cos( tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
-
-    pre_multiplier = 2. * _powers * tf.reduce_prod(tf.math.reciprocal(_bandwidths), axis = 0) # expected shape (M, )
-
-    Kzf  = pre_multiplier[..., None] * sine_term * cosine_term # expected shape (M, N)
-
-    return Kzf
-
-#TODO -- need to introduce these
-@Kuf.register(AsymRectangularSpectralInducingPoints, DecomposedMultipleSpectralBlock, TensorLike)
-#TODO -- re-introduce the check_shapes 
-#@check_shapes(
-#    "inducing_variable: [M, D, 1]",
-#    "Xnew: [batch..., N, D]",
-#    "return: [M, batch..., N]",
-#)
-def Kuf_asym_block_spectral_kernel_inducingpoints(
-    inducing_variable: AsymRectangularSpectralInducingPoints, 
-    kernel: DecomposedMultipleSpectralBlock, 
-    Xnew: TensorType
-) -> tf.Tensor:
-
+    Corresponds to Real and Imaginary part of equation ... 
     """
-    Implies having inter-domain inducing points with just one rectangular 
-    function in their spectrum. In practice, we also use the symmetrical rectangular
-    function but as a different inter-domain inducing point.
-    """
+    #NOTE -- this will only work for 1D data!
+    _alpha = tf.reshape(kernel.alpha, [-1,]) # [1,]
+    _gamma = tf.reshape(kernel.bandwidths, [-1,]) # [Q,]
+    _sigma = tf.reshape(kernel.powers, [-1,]) # [Q,]
+    _theta = tf.reshape(theta, [-1,]) # [Q,]
 
-    _means = kernel.means # expected shape [D, M]
-    _bandwidths = kernel.bandwidths # expected shape [D, M]
-    _real_powers = kernel.real_powers # expected shape [M, ]
-    _img_powers = kernel.img_powers # expected shape [M, ]
+    _pi = np.pi
 
-    #################
-    ### real part ###
-    #################
+    at = _alpha / _pi**2 # [1,]
+    gt = _gamma / _pi**2 # [Q,]
+    L = 1./at + 1./gt # [Q,]
 
-    ### positive frequencies 
+    # prepare for broadcasting
+    at = at[tf.newaxis, :, tf.newaxis] # [1, 1, 1]
+    gt = gt[tf.newaxis, :, tf.newaxis] # [1, Q, 1]
+    L = L[tf.newaxis, :, tf.newaxis] # [1, Q, 1]
 
-    r_sine_term = tf.reduce_prod( tf.sin(tf.cast(np.pi, default_float()) * tf.multiply(
-        tf.transpose(_bandwidths)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
-    
-    r_pos_cosine_term = tf.reduce_prod( tf.cos(2. * tf.cast(np.pi, default_float()) * 
-                                               tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
+    Kuf = _sigma[tf.newaxis, :, tf.newaxis]**2 / tf.sqrt(_pi * (at+gt)) # [1,Q,1]
 
-    #NOTE -- this is the case where we pre-multiply the inter-domain
-    # inducing points with $\sqrt{\alpha}$ in the definition.
-    r_pre_multiplier = _real_powers * tf.reduce_prod(
-        tf.math.reciprocal(2. * _bandwidths), axis = 0) # expected shape (M, )
-    r_pre_multiplier *= tf.cast(np.pi, default_float()) 
-    #NOTE -- uncomment this to retrive the original formulation of inter-domain inducing points
-    #r_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
+    Kuf*= tf.math.exp(- tf.square(tf.reshape(xi, [-1,1,1])
+                                - tf.reshape(_theta, [1,-1,1])
+                                ) # [M, Q, 1] 
+                        / (at+gt) - tf.square(tf.reshape(t, [1, 1, -1])) # [N, 1, 1]
+                    * _pi**2 / L) # [M, Q, 1]
 
-    pos_real_part  = r_pre_multiplier[..., None] * r_sine_term * r_pos_cosine_term # expected shape (M, N)
+    #NOTE -- why do we have a minus sign inside the cosine?
+    Kuf_real = Kuf * tf.math.cos(- 2*_pi* (tf.reshape(xi, [-1,1,1]) / at # [M, Q, 1] 
+                        + tf.reshape(_theta, [1,-1,1]) / gt # [1, Q, 1]
+                        )
+                        / L # [M, Q, 1] 
+                        * tf.reshape(t, [1,1,-1]) # [1, 1, N]
+                        ) # [M, Q, N]
+    Kuf_real = tf.reduce_sum(Kuf_real, axis=1) # [M,N]
 
-    ### negative frequencies
+    Kuf_img = Kuf * tf.math.sin(- 2*_pi* (tf.reshape(xi, [-1,1,1]) / at # [M, Q, 1] 
+                        + tf.reshape(_theta, [1,-1,1]) / gt # [1, Q, 1]
+                        )
+                        / L # [M, Q, 1] 
+                        * tf.reshape(t, [1,1,-1]) # [1, 1, N]
+                        ) # [M, Q, N]
+    Kuf_img = tf.reduce_sum(Kuf_img, axis=1) # [M,N]
 
-    #NOTE -- the negative sign comes from the fact that the sine is an odd function
-    neg_real_part  = -r_pre_multiplier[..., None] * r_sine_term * r_pos_cosine_term # expected shape (M, N)
-
-    real_part = tf.concat([pos_real_part, neg_real_part], axis = 0)
-
-
-    ######################
-    ### imaginary part ###
-    ######################
-
-    ### positive frequencies 
-
-    #NOTE -- this is the case where we pre-multiply the inter-domain
-    # inducing points with $\sqrt{\alpha}$ in the definition.
-    i_pre_multiplier = _img_powers * tf.reduce_prod(
-        tf.math.reciprocal(2. * _bandwidths), axis = 0) # expected shape (M, )
-    i_pre_multiplier *= tf.cast(np.pi, default_float()) 
-    #NOTE -- uncomment this to retrive the original formulation of inter-domain inducing points
-    #i_pre_multiplier /= tf.cast(tf.sqrt(kernel.alpha), default_float())
-
-    i_pos_sine_term = tf.reduce_prod( tf.sin( 2. * tf.cast(np.pi, default_float())
-                                             * tf.multiply(tf.transpose(_means)[..., None], # [M, D, 1]
-        tf.transpose(Xnew)[None, ...] # [1, D, N]
-    ) #[M, D, N]
-    ), axis = 1) #[M, N]
-
-    pos_img_part  = i_pre_multiplier[..., None] * r_sine_term * i_pos_sine_term # expected shape (M, N)
-
-    # negative frequencies
-
-    #NOTE -- the negative sign comes from the fact that the sine is an odd function
-    neg_img_part  = - i_pre_multiplier[..., None] * r_sine_term * i_pos_sine_term # expected shape (M, N)
-
-    img_part = tf.concat([pos_img_part, neg_img_part], axis = 0)
-
-    #NOTE -- this is the case when we are taking just the positive frequencies.
-    #Kzf = tf.concat([pos_real_part, pos_img_part], axis = 0)
-    Kzf = tf.concat([real_part, img_part], axis = 0)
-
-
-    return Kzf
+    return Kuf_real, Kuf_img
 
 
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)

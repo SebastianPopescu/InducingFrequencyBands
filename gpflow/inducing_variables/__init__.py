@@ -1,7 +1,7 @@
 from . import multioutput
 from .inducing_patch import InducingPatches
 from .inducing_variables import SpectralInducingPoints, InducingPoints, InducingVariables, Multiscale
-from .spectral_inducing_variables import SpectralInducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
+from .spectral_inducing_variables import SpectralInducingVariables, SymRectangularSpectralInducingPoints
 from .multioutput import (
     FallbackSeparateIndependentInducingVariables,
     FallbackSharedIndependentInducingVariables,
@@ -37,5 +37,4 @@ __all__ = [
     "SharedIndependentSpectralInducingVariables",
     "SpectralInducingVariables", 
     "SymRectangularSpectralInducingPoints",
-    "AsymRectangularSpectralInducingPoints",
 ]

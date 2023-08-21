@@ -62,6 +62,7 @@ class SpectralInducingVariables(Module, abc.ABC):
 class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
     def __init__(self, 
         kern: MultipleSpectralBlock,
+        Z: TensorData,
         name: Optional[str] = None
         ):
         """
@@ -74,12 +75,16 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
         super().__init__(name=name)
         self.kern = kern
 
+        if not isinstance(Z, (tf.Variable, tfp.util.TransformedVariable)):
+            Z = Parameter(Z)
+        self.Z = Z
+
     @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
     @check_shapes(
         "return: []",
     )
     def num_inducing(self) -> Optional[tf.Tensor]:
-        return self.kern.n_components
+        return tf.shape(self.Z)[0] * 2
 
     @property
     def shape(self) -> Shape:
@@ -95,21 +100,3 @@ class SymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase
     given by symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
     """
 
-
-class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
-    """
-    Real-space (in output space) "spectral" inter-domain inducing points with a PSD 
-    given by asymmetrical rectangles. Corresponding kernel is the multi sinc kernel,
-    where the powers of the individiaul sinc kernels stem from the summation of powers
-    of the asymetrical rectangular blocks corresponding to the cosine and sine transform,
-    respectively.
-    """
-
-    @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
-    @check_shapes(
-        "return: []",
-    )
-    def num_inducing(self) -> Optional[tf.Tensor]:
-        #NOTE -- this is the case when we only consider positive frequencies
-        #return self.kern.n_components * 2
-        return self.kern.n_components * 4

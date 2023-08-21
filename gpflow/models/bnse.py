@@ -233,8 +233,6 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
         
         return cov_real, xcov_real, Kmm
     
- 
-
 
     def complex_gp_spectrum_covariances(self, x, y, kernel = 'sm'):
 
@@ -266,9 +264,7 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
             #NOTE -- remainder: Kir = Kri = 0 since the underlying signal is real-valued.
 
         return real_cov, imag_cov
-
-
-
+    
     def spectrum_covariance(self, xi1, xi2, theta):
 
         r"""

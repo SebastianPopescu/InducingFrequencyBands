@@ -17,8 +17,8 @@ import numpy as np
 from check_shapes import check_shapes
 
 from ..config import default_float
-from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints, AsymRectangularSpectralInducingPoints
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, DecomposedMultipleSpectralBlock
+from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints 
+from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, MixtureSpectralGaussianVectorized
 from .dispatch import Kuu
 
 
@@ -61,226 +61,78 @@ def Kuu_block_spectral_kernel_inducingpoints(
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
     return Kzz
 
-####################################################
-##Helper functions for approximating the real Kuu ##
-def midpoint_rule(x, std, a, b, n, Burmann_series):
 
-    # Calculate the width of each subinterval
-    h = (b - a) / n
-    
-    # Calculate the midpoint values for each subinterval
-    mean_midpoints = tf.linspace(a + h/2, b - h/2, n)
-
-    # Evaluate the function at the midpoint values
-
-    if Burmann_series:
-        #NOTE -- this is usign the Burmann series second order approximation
-        f_midpoints = burmann_series_approx_erf(x, mean_midpoints, std)
-    else:
-        #NOTE -- this is using the default Tensorflow version
-        f_midpoints = 0.5*(1.0+tf.math.erf((x[tf.newaxis,...]-mean_midpoints)/(tf.cast(tf.math.sqrt(2.),
-                                                               default_float())*std)))
-
-    print('f_midpoints')
-    print(f_midpoints)
-    # Calculate the approximate integral using the midpoint rule formula
-    integral_approx = h * tf.reduce_sum(f_midpoints, axis = 0)
-    
-    return integral_approx
-
-
-def burmann_series_approx_erf(x, mean, std):
-
-    #\operatorname{erf}\left( \frac{w_{1}-w'}{\sqrt{\frac{2\alpha}{\pi^{2}}}} \right) 
-    res = burmann_series_second_order_approx((x-mean)/(tf.cast(tf.math.sqrt(2.),
-                                                               default_float())*std))
-
-    return res
-
-
-def burmann_series_second_order_approx(x):
-
-    """
-    Implements a Burmann Series approximation of order 2 to the ERF function
-    
-    Latex math code:
-
-    \operatorname{erf}\left( x \right) \approx \frac{2}{\sqrt{\pi}}
-    \operatorname{sgn}\left( x \right) \sqrt{1 - \exp{-x^{2}}} 
-    \left[ \frac{\sqrt{\pi}}{2} + \frac{31}{200}\exp{-x^{2}} 
-    - \frac{341}{8000}\exp{-2x^{2}}\right]   
-    """
-
-    res = tf.cast(2./tf.sqrt(np.pi), default_float()) * tf.math.sign(x) * tf.cast(tf.sqrt(1. - tf.math.exp(-x**2)), default_float())
-    res *= (np.pi/2. + 31./200. * tf.math.exp(-x**2) - 341./8000. * tf.math.exp(-2.*x**2))
-    return res
-
-
-# Helper function -- implements the approximation for a single spectral block for Kuu.
-#NOTE -- this uses the Fourier transform of \exp^{\alpha x^{2}} so these results
-# are only okay for the symmetrical blocks case.
-def Kuu_single_block_symmetrical_multi_spectral_kernel_inducingpoints(
-    inducing_variable, kernel, means, powers, *, jitter: float = 0.0):
-    
-    #NOTE -- this is the unwindowed case
-    #Kzz = tf.linalg.diag(kernel.powers)
-    #Kzz = tf.cast(Kzz, default_float())
-
-    #NOTE -- implements the following integral but approximated numerically
-    #NOTE -- erf is implemented via the second order Burmann series approximation
-    #TODO -- do I need  to use tf.stop_gradients here?
-
-    num_approx_N = 1000
-
-    Kzz = tf.linalg.diag(powers / (2. * kernel.bandwidths))
-
-    lower_limit = means - 0.5 * kernel.bandwidths
-    upper_limit = means + 0.5 * kernel.bandwidths
-    
-    num_int_approx = midpoint_rule(upper_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
-                                                              , default_float()) / 
-                                   tf.cast(np.pi, default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N,
-                                   Burmann_series=False,
-                                   )
-    
-    num_int_approx -= midpoint_rule(lower_limit, std = tf.cast(tf.math.sqrt(kernel.alpha)
-                                                               , default_float()) / 
-                                    tf.cast(np.pi,default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N,
-                                   Burmann_series=False,
-                                   )
-    
-    Kzz *= tf.linalg.diag(num_int_approx)
-
-    return tf.squeeze(Kzz, axis = 0)
-
-
-#NOTE -- this uses the Fourier cosine/sine transform of \exp^{\alpha x^{2}} so these 
-# results are only okay for the asymmetrical blocks case.
-def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
-    inducing_variable, kernel, means, powers, *, jitter: float = 0.0):
-    
-    #NOTE -- this is the unwindowed case
-    #Kzz = tf.linalg.diag(kernel.powers)
-    #Kzz = tf.cast(Kzz, default_float())
-
-    #NOTE -- implements the following integral but approximated numerically
-    #NOTE -- erf is implemented via the second order Burmann series approximation
-    #TODO -- do I need  to use tf.stop_gradients here?
-
-    num_approx_N = 1000
-    
-    #NOTE -- original formulation
-    #Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
-    #                     / (2. * kernel.bandwidths * kernel.alpha))
-
-    #NOTE -- this is the case where we pre-multiply the inter-domain
-    # inducing points with $\sqrt{\alpha}$ in the definition.
-    Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
-                         / (2. * kernel.bandwidths))
-
-    lower_limit = means - 0.5 * kernel.bandwidths
-    upper_limit = means + 0.5 * kernel.bandwidths
-    
-    num_int_approx = midpoint_rule(upper_limit, std = tf.cast(tf.math.sqrt(2.*kernel.alpha)
-                                                              , default_float()) / 
-                                   tf.cast(np.pi, default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N,
-                                   Burmann_series=False,
-                                   )
-    
-    num_int_approx -= midpoint_rule(lower_limit, std = tf.cast(tf.math.sqrt(2.*kernel.alpha)
-                                                               , default_float()) / 
-                                    tf.cast(np.pi,default_float()), 
-                                   a = lower_limit, b = upper_limit, n = num_approx_N,
-                                   Burmann_series=False,
-                                   )
-    
-    Kzz *= tf.linalg.diag(num_int_approx)
-
-    return tf.squeeze(Kzz, axis = 0)
-
-
-#helper function
-def update_off_diagonal(tensor, bandwidth_powers):
-    shape = tf.shape(tensor)
-    rows, cols = shape[0], shape[1]
-    
-    #get indces of elements
-    indices = tf.where(tf.ones_like(tensor, dtype=tf.bool))
-
-    #get the right spectral bandwidth for the combination of i,j in Kuu
-    desired_band = tf.cast(tf.reduce_sum(indices, axis = -1), tf.float32) * 0.5
-    desired_band = tf.cast(desired_band, tf.int32)
-
-    #TODO -- can this be vectorized?
-    updates = [bandwidth_powers[_] for _ in desired_band]
-    
-    # Update elements in even and odd positions of Kuu in the off-diagonal
-    # FIXME -- this should update just the off-diagonal elements only    
-    updated_tensor = tf.tensor_scatter_nd_update(tensor, indices, updates)
-
-    return updated_tensor
-
-#NOTE -- this uses the Fourier cosine/sine transform of \exp^{\alpha x^{2}} so these 
-# results are only okay for the asymmetrical blocks case.
-def Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_full_version(
-    inducing_variable, kernel, means, powers, *, jitter: float = 0.0):
+@Kuu.register(SymRectangularSpectralInducingPoints, MixtureSpectralGaussianVectorized)
+def Kuu_windowed_mixture_gaussian_spectral_kernel_inducingpoints(
+    inducing_variable: SymRectangularSpectralInducingPoints, kernel: MixtureSpectralGaussianVectorized, *, jitter: float = 0.0
+) -> tf.Tensor:
     
     """
-    Attempt at implementing a full Kuu matrix, with non-zero off-diagonals.
+    To be used for ReverseBNSE.
     """
 
-    #NOTE -- this is the unwindowed case
-    #Kzz = tf.linalg.diag(kernel.powers)
-    #Kzz = tf.cast(Kzz, default_float())
+    # Spectrum covariance
+    # 0.5 scaling is due to missing 0.5 scaling in ``spectrum_covariance''          
+    K = 0.5*(spectrum_covariance(inducing_variable.Z, inducing_variable.Z, kernel.means, kernel) + 
+            spectrum_covariance(inducing_variable.Z, inducing_variable.Z, -kernel.means, kernel))
+    # Spectrum pseudo-covariance
+    P = 0.5*(spectrum_covariance(inducing_variable.Z, -inducing_variable.Z, kernel.means, kernel) + 
+            spectrum_covariance(inducing_variable.Z, -inducing_variable.Z, -kernel.means, kernel))
+    # Krr -- real covariance
+    #TODO -- maybe add jitter later on
+    real_cov = 0.5*(K + P) #+ 1e-8*tf.eye(N, dtype = default_float())
+    # Kii -- imaginary covariance
+    #TODO -- maybe add jitter later on
+    imag_cov = 0.5*(K - P) #+ 1e-8*tf.eye(N, dtype = default_float())
+    #NOTE -- remainder: Kir = Kri = 0 since the underlying signal is real-valued.
 
-    #NOTE -- implements the following integral but approximated numerically
-    #NOTE -- erf is implemented via the second order Burmann series approximation
-    #TODO -- do I need  to use tf.stop_gradients here?
+    return BlockDiagMat(real_cov, imag_cov)
 
-    num_approx_N = 20
+def spectrum_covariance(xi1, xi2, theta, kernel):
 
-    #NOTE -- this is the case where we pre-multiply the inter-domain
-    # inducing points with $\sqrt{\alpha}$ in the definition.
-    Kzz = tf.linalg.diag( tf.square(tf.cast(np.pi, default_float())) * powers 
-                         / (2. * kernel.bandwidths * kernel.alpha))
-    print('-- Kzz just diagonal ---')
-    print(Kzz)
-    Kzz = update_off_diagonal(Kzz, powers) * tf.square(tf.cast(np.pi, default_float())) / (2. * kernel.bandwidths * kernel.alpha)
-    print('--- Kzz after off-diagonal update ---')
-    print(Kzz)
+    r"""
+    Computes K_{ff}\left( \xi, \xi' \right).
 
-    lower_limit = means - 0.5 * kernel.bandwidths
-    upper_limit = means + 0.5 * kernel.bandwidths
+    Corresponds to equation 17 from BNSE paper.
+
+    xi1 # [M,]
+    xi2 # [M',]
+    """
+
+    """
+    magnitude = np.pi * sigma**2 / (np.sqrt(alpha*(alpha + 2*gamma)))
+    return magnitude * np.exp(-np.pi**2/(2*alpha)*outersum(x,-y)**2 - 2*np.pi*2/(alpha + 2*gamma)*(outersum(x,y)/2-theta)**2)
+    """
+
+    #NOTE -- this will only work for 1D data!
+    _alpha = tf.reshape(kernel.alpha, [-1,]) # [1,]
+    _gamma = tf.reshape(kernel.bandwidths, [-1,]) # [Q,]
+    _sigma = tf.reshape(kernel.powers, [-1,]) # [Q,]
+    _theta = tf.reshape(theta, [-1,]) # [Q,]
+
+    _pi = np.pi
+
+    magnitude = _pi * _sigma**2 / (tf.sqrt(_alpha * (_alpha + 2.*_gamma))) # [Q,]
+    magnitude = magnitude[tf.newaxis, :, tf.newaxis] # [1, Q, 1]
+
+    Kxi_xi = tf.math.exp(-_pi**2/(2.*_alpha[tf.newaxis, :, tf.newaxis]) * #  [1, 1, 1]
+                            tf.square(tf.reshape(xi1, [-1,1]) - tf.reshape(xi2,[1,-1]))[:,tf.newaxis,:] # [M, 1, M']
+                            ) # [M, 1, M']
+    Kxi_xi *= tf.math.exp( - 2.*_pi**2/
+                            (_alpha + 2.*_gamma)[tf.newaxis, :, tf.newaxis] # [1, Q, 1]
+                            * tf.square((tf.reshape(xi1, [-1,1]) + tf.reshape(xi2,[1,-1]))[:,tf.newaxis,:]/2. # [M, 1, M']
+                                        -tf.reshape(_theta,[1,-1,1]) # [1, Q, 1]
+                                        ) # [M, Q, M']
+                            ) # [M, Q, M']
     
-    num_int_approx = midpoint_rule(tf.reshape(upper_limit,[-1,1]), std = tf.cast(tf.math.sqrt(2.*kernel.alpha)
-                                                              , default_float()) / 
-                                    tf.cast(np.pi, default_float()), 
-                                    a = tf.reshape(lower_limit, [1,-1]), b = tf.reshape(upper_limit, [1,-1]), 
-                                    n = num_approx_N,
-                                    Burmann_series=False,
-                                    )
-    print('---- first num_int_approx - -----')
-    print(num_int_approx)
-    
-    second_num_int_approx = midpoint_rule(tf.reshape(lower_limit,[-1,1]), std = tf.cast(tf.math.sqrt(2.*kernel.alpha)
-                                                               , default_float()) / 
-                                    tf.cast(np.pi,default_float()), 
-                                    a = tf.reshape(lower_limit, [1,-1]), b = tf.reshape(upper_limit, [1,-1]),
-                                    n = num_approx_N,
-                                    Burmann_series=False,
-                                    )
-    print('---- second num_int_approx - -----')
-    print(second_num_int_approx)
-    num_approx_N -= second_num_int_approx
-    #Kzz *= num_int_approx
+    return tf.reduce_sum(magnitude * Kxi_xi, axis=1) # [M, M']
 
-    print('---- Kzz  -----')
-    print(Kzz)
+#TODO -- seems to not work with ``Parameters''
+def outersum(a, b):
+    _ = tf.experimental.numpy.outer(a, tf.ones_like(b))
+    __ = tf.experimental.numpy.outer(tf.ones_like(a), b)
 
-    return tf.squeeze(Kzz, axis = 0)
+    return _ + __
 
 
 def BlockDiagMat(A, B):
@@ -293,60 +145,6 @@ def BlockDiagMat(A, B):
     return tf.concat([top, bottom], axis=0)
 
 
-@Kuu.register(SymRectangularSpectralInducingPoints, MultipleSpectralBlock)
-def Kuu_sym_block_multi_spectral_kernel_inducingpoints(
-    inducing_variable: SymRectangularSpectralInducingPoints, kernel: MultipleSpectralBlock, *, jitter: float = 0.0
-) -> tf.Tensor:
-    
-    #NOTE -- this is the unwindowed case
-    #Kzz = tf.linalg.diag(kernel.powers)
-    #Kzz = tf.cast(Kzz, default_float())
-
-    Kzz = Kuu_single_block_symmetrical_multi_spectral_kernel_inducingpoints(
-        inducing_variable, kernel, kernel.means, kernel.powers)
-    #TODO -- fix this little hack, the midpoint rule is giving me a leading 1 dimension
-    #NOTE -- doubling the results should account for the two symmetrical rectangular functions.
-    #TODO -- need to double check the maths here to be sure that a doubling is sufficient.
-    return 2. * Kzz
-
-@Kuu.register(AsymRectangularSpectralInducingPoints, DecomposedMultipleSpectralBlock)
-def Kuu_asym_block_multi_spectral_kernel_inducingpoints(
-    inducing_variable: AsymRectangularSpectralInducingPoints, kernel: DecomposedMultipleSpectralBlock, *, jitter: float = 0.0
-) -> tf.Tensor:
-
-    # Real features corresponding to the cosine transform
-    r_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
-        inducing_variable, kernel, kernel.means, kernel.real_powers)
-    r_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
-        inducing_variable, kernel, -kernel.means, kernel.real_powers)
-
-    #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
-    r_Kzz = BlockDiagMat(r_Kzz_positive_freq, r_Kzz_negative_freq)
-    
-    # Real features corresponding to the sine transform
-    i_Kzz_positive_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
-        inducing_variable, kernel, kernel.means, kernel.img_powers)
-    i_Kzz_negative_freq = Kuu_single_block_asymmetrical_multi_spectral_kernel_inducingpoints_diagonal_version(
-        inducing_variable, kernel, -kernel.means, kernel.img_powers)
-
-    #NOTE -- I have to be careful in Kuf to maintain the positive, negative freq ordering
-    i_Kzz = BlockDiagMat(i_Kzz_positive_freq, i_Kzz_negative_freq)
-
-    #NOTE -- I have to be careful in Kuf to maintain the real, imaginary features ordering
-
-    #NOTE -- this is the unwindowed case
-    #r_Kzz = BlockDiagMat(tf.linalg.diag(kernel.real_powers), tf.linalg.diag(kernel.real_powers))
-    #i_Kzz = BlockDiagMat(tf.linalg.diag(kernel.img_powers), tf.linalg.diag(kernel.img_powers))
-    
-    #NOTE -- this is the version just with positive frequencies
-    #return BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
-    
-    Kzz = BlockDiagMat(r_Kzz, i_Kzz)
-    #Kzz = BlockDiagMat(r_Kzz_positive_freq, i_Kzz_positive_freq)
-    print('---- Kzz ----')
-    print(Kzz)
-
-    return Kzz
 
 @Kuu.register(Multiscale, SquaredExponential)
 @check_shapes(

@@ -403,7 +403,7 @@ class SpectralGaussian(AnisotropicSpectralStationary):
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) # expected shape -- [N1, N2]
        
         descaled_d = d * tf.transpose(tf.math.reciprocal(self.means))[None, :, :] # expected shape [N1, N2, D]
-        exponential_term = tf.exp(-2. * math.pi ** 2 * 
+        exponential_term = tf.exp(-
                                   tf.reduce_sum(tf.square(descaled_d) * 
                                                 tf.transpose(self.bandwidths)[None, :, :]
                                                 , axis=-1))
@@ -454,10 +454,13 @@ def MixtureSpectralGaussian(
 
     return sum_kernel
 
-#NOTE -- to be used just for BNSE model
+
 class MixtureSpectralGaussianVectorized(AnisotropicSpectralStationary):
-    """The primitive kernel whose spectral density is comprised of a 
-    pair of symmetrical Gaussians."""
+    """spectral density is comprised of 
+    pairs of symmetrical Gaussians.
+    
+    To be used only with BNSE model.
+    """
 
     def __init__(self, 
         powers, # stands for A -- expected shape [Q, ]

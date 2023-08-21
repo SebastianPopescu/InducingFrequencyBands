@@ -47,11 +47,10 @@ from .inducing_variables import (
     InducingVariables,
     SeparateIndependentInducingVariables,
     SharedIndependentInducingVariables,
-    AsymRectangularSpectralInducingPoints,
     SymRectangularSpectralInducingPoints
 )
 
-from .kernels import Kernel, MultipleSpectralBlock, DecomposedMultipleSpectralBlock
+from .kernels import Kernel, MultipleSpectralBlock, MixtureSpectralGaussianVectorized
 from .likelihoods import Gaussian
 from .mean_functions import MeanFunction
 from .utilities import Dispatcher, add_likelihood_noise_cov, assert_params_false
@@ -1050,16 +1049,9 @@ def _get_posterior_base_case(
     # independent single output
     return IndependentPosteriorSingleOutput
 
-@get_posterior_class.register(MultipleSpectralBlock, SymRectangularSpectralInducingPoints)
+@get_posterior_class.register(MixtureSpectralGaussianVectorized, SymRectangularSpectralInducingPoints)
 def _get_posterior_base_spectral_case(
-    kernel: MultipleSpectralBlock, inducing_variable: SymRectangularSpectralInducingPoints
-) -> Type[BasePosterior]:
-    # independent single output
-    return IndependentPosteriorSingleOutput
-
-@get_posterior_class.register(MultipleSpectralBlock, AsymRectangularSpectralInducingPoints)
-def _get_posterior_base_spectral_case(
-    kernel: DecomposedMultipleSpectralBlock, inducing_variable: AsymRectangularSpectralInducingPoints
+    kernel: MixtureSpectralGaussianVectorized, inducing_variable: SymRectangularSpectralInducingPoints
 ) -> Type[BasePosterior]:
     # independent single output
     return IndependentPosteriorSingleOutput
