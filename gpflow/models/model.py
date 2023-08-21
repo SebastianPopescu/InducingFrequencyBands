@@ -26,6 +26,64 @@ from ..mean_functions import MeanFunction, Zero
 from ..utilities import assert_params_false, to_default_float
 
 
+class TimeSpectrumBayesianModel(Module, metaclass=abc.ABCMeta):
+    """Time <--> Spectrum Bayesian model.
+
+    This is a base class for all models that can go from spectrum to time domain and vice-versa.
+    """
+
+    @check_shapes(
+        "return: []",
+    )
+    def log_prior_density(self) -> tf.Tensor:
+        """
+        Sum of the log prior probability densities of all (constrained) variables in this model.
+        """
+        if self.trainable_parameters:
+            return tf.add_n([p.log_prior_density() for p in self.trainable_parameters])
+        else:
+            return to_default_float(0.0)
+
+    @check_shapes(
+        "return: []",
+    )
+    def log_posterior_density(self, *args: Any, **kwargs: Any) -> tf.Tensor:
+        """
+        This may be the posterior with respect to the hyperparameters (e.g. for
+        GPR) or the posterior with respect to the function (e.g. for GPMC and
+        SGPMC). It assumes that maximum_log_likelihood_objective() is defined
+        sensibly.
+        """
+        return self.maximum_log_likelihood_objective(*args, **kwargs) + self.log_prior_density()
+
+    @check_shapes(
+        "return: []",
+    )
+    def _training_loss(self, *args: Any, **kwargs: Any) -> tf.Tensor:
+        """
+        Training loss definition. To allow MAP (maximum a-posteriori) estimation,
+        adds the log density of all priors to maximum_log_likelihood_objective().
+        """
+
+        return -(self.maximum_log_likelihood_objective(*args, **kwargs) + self.log_prior_density())
+
+    @abc.abstractmethod
+    @check_shapes(
+        "return: []",
+    )
+    def maximum_log_likelihood_objective(self, *args: Any, **kwargs: Any) -> tf.Tensor:
+        """
+        #TODO -- update documentation
+        
+        Objective for maximum likelihood estimation. Should be maximized. E.g.
+        log-marginal likelihood (hyperparameter likelihood) for GPR, or lower
+        bound to the log-marginal likelihood (ELBO) for sparse and variational
+        GPs.
+        """
+        raise NotImplementedError
+
+
+
 class BayesianModel(Module, metaclass=abc.ABCMeta):
     """Bayesian model.
 

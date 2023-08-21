@@ -23,15 +23,17 @@ from .cglb import CGLB
 from .gplvm import GPLVM, BayesianGPLVM
 from .gpmc import GPMC
 from .gpr import GPR
-from .model import BayesianModel, GPModel
+from .model import BayesianModel, GPModel, TimeSpectrumBayesianModel
 from .sgpmc import SGPMC
 from .sgpr import GPRFITC, SGPR
 from .svgp import SVGP
+from .bnse import BNSE
 from .training_mixins import ExternalDataTrainingLossMixin, InternalDataTrainingLossMixin
 from .util import maximum_log_likelihood_objective, training_loss, training_loss_closure
 from .vgp import VGP, VGPOpperArchambeau
 
 __all__ = [
+    "BNSE",
     "BayesianGPLVM",
     "BayesianModel",
     "CGLB",
@@ -39,6 +41,7 @@ __all__ = [
     "GPLVM",
     "GPMC",
     "GPModel",
+    "TimeSpectrumBayesianModel",
     "GPR",
     "GPRFITC",
     "InternalDataTrainingLossMixin",
