@@ -2,11 +2,12 @@
 #NOTE -- this is from Tobar's package
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy.optimize import minimize
 from scipy.signal import find_peaks, peak_widths
 from gpflow.models import BNSE
 from gpflow.kernels import MixtureSpectralGaussian
+import statsmodels.api as sm
+import gpflow
 #import scipy.signal as sp
 #sns.set_style("whitegrid")
 #import scipy.signal as sp
@@ -22,7 +23,7 @@ plt.rcParams.update(plot_params)
 
 
 EXPERIMENT = 'hr1'
-#EXPERIMENT = 'hr2'
+#EXPERIMENT = 'hr1'
 #EXPERIMENT = 'sunspots'
 
 if EXPERIMENT=='hr1':
@@ -53,63 +54,49 @@ indices = np.sort(indices)
 signal = signal[indices]
 time = time[indices]
 
+time = time.reshape((-1,1))
+time = time - np.median(time)
+signal = signal.reshape((-1,1))
+
 MODEL = 'GPR'
-
-
-kern = MixtureSpectralGaussian(n_components=,
-                               means= ,
-                               bandwidths=,
-                               powers=)
-my_bse = BNSE(data = (time, signal))
-my_bse.set_labels(time_label, signal_label)
+KERNEL = 'SpecMixGaus'
+N_FREQS = 500
+model = BNSE(data = (time, signal))
+model.set_labels(time_label, signal_label)
 
 if EXPERIMENT=='hr1':
-    my_bse.set_freqspace(0.03)
+    model.set_freqspace(0.03, N_FREQS)
 
 elif EXPERIMENT == 'hr2':
-    my_bse.set_freqspace(0.03)
+    model.set_freqspace(0.03, N_FREQS)
 
 elif EXPERIMENT == 'sunspots':
-    my_bse.set_freqspace(0.2)
+    model.set_freqspace(0.2, N_FREQS)
 
+# Training 
+optimise = True
+MAXITER=100
+if optimise:
+    #gpflow.set_trainable(model.likelihood, False)
 
+    opt_logs = gpflow.optimizers.Scipy().minimize(
+        model.training_loss,
+        variables=model.trainable_variables,
+        method="l-bfgs-b",
+        options={"disp": True, "maxiter": MAXITER},
+    )
 
+noise_variance = model.likelihood.variance.numpy()
+print(f'Negative log likelihood (before training): {noise_variance}')
 
-my_bse.train()
+#nll = model.neg_log_likelihood()
+#print(f'Negative log likelihood (before training): {nll}')
+_time = np.linspace(np.min(time), np.max(time), 500)
+_time = _time.reshape((-1,1))
+_w = np.linspace(0, N_OBSERVATIONS / (np.max(time) - np.min(time)) / 16., 500)
+model.compute_moments(Xnew=_time)
 
-#after training
-
-nll = my_bse.neg_log_likelihood()
-print(f'Negative log likelihood (before training): {nll}')
-my_bse.compute_moments()
-my_bse.plot_time_posterior()
-#plt.savefig("posterior_time.pdf", bbox_inches='tight', pad_inches=0)
-
-
-"""
-my_bse.plot_freq_posterior_real()
-plt.savefig("posterior_spectrum_real.pdf", bbox_inches='tight', pad_inches=0)
-my_bse.plot_freq_posterior_imag()
-plt.savefig("posterior_spectrum_imag.pdf", bbox_inches='tight', pad_inches=0)
-
-my_bse.plot_power_spectral_density(15)
-
-peaks, widths = my_bse.plot_power_spectral_density(15, 'show peaks');
-plt.savefig("posterior_psd.pdf", bbox_inches='tight', pad_inches=0)
-
-print(f'Peaks are at positions {peaks*(my_bse.w[1]-my_bse.w[0]) }')
-print(f'and their widths are {widths[0]*(my_bse.w[1]-my_bse.w[0])}')
-"""
-
-
-##################################
-##################################
-### Plotting functions ###########
-##################################
-##################################
-
-def plot_time_posterior(self, 
-                        X, 
+def plot_time_posterior(X, 
                         Y, 
                         Xnew, 
                         model, 
@@ -127,127 +114,112 @@ def plot_time_posterior(self,
     #posterior moments for time domain 
     plt.figure(figsize = (18, 6))
     plt.plot(X, Y,'.r', markersize=10, label='observations')
-    plt.plot(Xnew, model.post_mean, color='blue', label='posterior mean')
+    plt.plot(Xnew.ravel(), model.post_mean.numpy().ravel(), color='blue', label='posterior mean')
     
-    error_bars = 2 * np.sqrt(np.diag(model.post_cov))
-    plt.fill_between(Xnew, model.post_mean - error_bars, model.post_mean + error_bars, 
+    error_bars = 2 * np.sqrt(np.diag(model.post_cov.numpy())).ravel()
+    plt.fill_between(Xnew.ravel(), model.post_mean.numpy().ravel() - error_bars, model.post_mean.numpy().ravel() + error_bars, 
                         color='blue', alpha=0.1, label='95% error bars')
     if flag == 'with_window':
-        plt.plot(Xnew, 2.*model.kernel.sigma * np.exp(-model.kernel.alpha * Xnew**2))
+        plt.plot(Xnew.ravel(), 2.*model.kernel.powers * np.exp(-model.kernel.alpha * Xnew**2))
     
     plt.title('Observations and posterior interpolation')
     plt.xlabel(time_label)
     plt.ylabel(signal_label)
     plt.legend()
-    plt.xlim([min(self.x),max(self.x)])
+    plt.xlim([min(X),max(X)])
     plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_time_domain_posterior.png')
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_time_domain_posterior_{EXPERIMENT}.png')
     plt.close()
+
+plot_time_posterior(X = time,
+                    Y = signal,
+                    Xnew = _time,
+                    model = model,
+                    time_label=time_label,
+                    signal_label=signal_label,
+                    flag='with_window'
+                    )
+#plt.savefig("posterior_time.pdf", bbox_inches='tight', pad_inches=0)
 
 
 def plot_freq_posterior_real(model):
     plt.figure(figsize=(18,6))
-    plt.plot(model.w, model.post_mean_r, color='blue', label='posterior mean')
+    plt.plot(model.w.ravel(), model.post_mean_r.numpy().ravel(), color='blue', label='posterior mean')
     
-    error_bars = 2 * np.sqrt((np.diag(model.post_cov_r)))
-    plt.fill_between(model.w, model.post_mean_r - error_bars, 
-                     model.post_mean_r + error_bars, color='blue',
+
+    print('---- post_cov_r ----')
+    print(model.post_cov_r.numpy())
+
+    error_bars = 2 * np.sqrt((np.diag(model.post_cov_r.numpy())))
+    plt.fill_between(model.w.ravel(), model.post_mean_r.numpy().ravel() - error_bars.ravel(), 
+                     model.post_mean_r.numpy().ravel() + error_bars.ravel(), color='blue',
                      alpha=0.1, label='95% error bars')
     
     plt.title('Posterior spectrum (real part)')
     plt.xlabel('frequency')
     plt.legend()
-    plt.xlim([min(model.w), max(model.w)])
+    plt.xlim([min(model.w.ravel()), max(model.w.ravel())])
     plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_freq_domain_posterior_real.png')
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_freq_domain_posterior_real_{EXPERIMENT}.png')
     plt.close()
 
 
 def plot_freq_posterior_imag(model):
     plt.figure(figsize=(18,6))
-    plt.plot(model.w, model.post_mean_i, color='blue', label='posterior mean')
+    plt.plot(model.w.ravel(), model.post_mean_i.numpy().ravel(), color='blue', label='posterior mean')
     
-    error_bars = 2. * np.sqrt((np.diag(model.post_cov_i)))
-    plt.fill_between(model.w, model.post_mean_i - error_bars, 
-                     model.post_mean_i + error_bars, color='blue',
+    print('---- post_cov_i ----')
+    print(model.post_cov_i.numpy())
+
+    error_bars = 2. * np.sqrt((np.diag(model.post_cov_i.numpy())))
+    plt.fill_between(model.w.ravel(), model.post_mean_i.numpy().ravel() - error_bars.ravel(), 
+                     model.post_mean_i.numpy().ravel() + error_bars.ravel(), color='blue',
                      alpha=0.1, label='95% error bars')
     
     plt.title('Posterior spectrum (imaginary part)')
     plt.xlabel('frequency')
     plt.legend()
-    plt.xlim([min(model.w),max(model.w)])
+    plt.xlim([min(model.w.ravel()),max(model.w.ravel())])
     plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_freq_domain_posterior_img.png')
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_freq_domain_posterior_img_{EXPERIMENT}.png')
     plt.close()
 
-def plot_freq_posterior():
-    plot_freq_posterior_real()
-    plot_freq_posterior_imag()
- 
-def plot_power_spectral_density_old(model, how_many, flag=None):
-    
-    #posterior moments for frequency
-    plt.figure(figsize=(18,6))
-    _w = model.w.numpy()
-    freqs = len(_w)
-    samples = np.zeros((freqs,how_many))
 
-    #convert to numpy
-    _post_mean_r = model.post_mean_r.numpy()
-    _post_mean_i = model.post_mean_i.numpy()
-    _post_cov_r = model.post_cov_r.numpy()
-    _post_cov_i = model.post_cov_i.numpy()
 
-    for i in range(how_many):               
-        sample_r = np.random.multivariate_normal(_post_mean_r, (_post_cov_r+_post_cov_r.T)/2 + 1e-5*np.eye(freqs))
-        sample_i = np.random.multivariate_normal(_post_mean_i, (_post_cov_i+_post_cov_i.T)/2 + 1e-5*np.eye(freqs))
-        samples[:,i] = sample_r**2 + sample_i**2
-    plt.plot(_w, samples, color='red', alpha=0.35)
-    plt.plot(_w, samples[:,0], color='red', alpha=0.35, label='posterior samples')
-    
-    posterior_mean_psd = _post_mean_r**2 + _post_mean_i**2 + np.diag(_post_cov_r + _post_cov_i)
-    plt.plot(_w,posterior_mean_psd, color='black', label = '(analytical) posterior mean')
-    if flag == 'show peaks':
-        peaks, _  = find_peaks(posterior_mean_psd, prominence=500000)
-        widths = peak_widths(posterior_mean_psd, peaks, rel_height=0.5)
-        plt.stem(_w[peaks],posterior_mean_psd[peaks], markerfmt='ko', label='peaks')
-    plt.title('Sample posterior power spectral density')
-    plt.xlabel('frequency')
-    plt.legend()
-    plt.xlim([min(self.w),max(self.w)])
-    plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_psd_old_version.png')
-    plt.close()
-    if flag == 'show peaks':
-        return peaks, widths
-        
+plot_freq_posterior_real(model=model)
+#plt.savefig("posterior_spectrum_real.pdf", bbox_inches='tight', pad_inches=0)
+plot_freq_posterior_imag(model=model)
+#plt.savefig("posterior_spectrum_imag.pdf", bbox_inches='tight', pad_inches=0)
 
+
+#TODO -- need to fix this at one point
 def plot_power_spectral_density(model, how_many, flag=None):
     #posterior moments for frequency
     plt.figure(figsize=(18,6))
-    _w = model.w.numpy()
+    _w = model.w
     freqs = len(_w)
     samples = np.zeros((freqs,how_many))
     
     #convert to numpy
-    _post_mean_r = model.post_mean_r.numpy()
-    _post_mean_i = model.post_mean_i.numpy()
+    _post_mean_r = model.post_mean_r.numpy().ravel()
+    _post_mean_i = model.post_mean_i.numpy().ravel()
     _post_cov_r = model.post_cov_r.numpy()
     _post_cov_i = model.post_cov_i.numpy()
-    _post_mean_F = model.post_mean_F.numpy()
+    _post_mean_F = model.post_mean_F.numpy().ravel()
     _post_cov_F = model.post_cov_F.numpy()
     
     for i in range(how_many):               
-        sample = np.random.multivariate_normal(_post_mean_F,(_post_cov_F + _post_cov_F.T)/2 
+        sample = np.random.multivariate_normal(_post_mean_F, (_post_cov_F + _post_cov_F.T)/2. 
                                                + 1e-5*np.eye(2*freqs))
         samples[:,i] = sample[0:freqs]**2 + sample[freqs:]**2
-    plt.plot(_w,samples, color='red', alpha=0.35)
-    plt.plot(_w,samples[:,0], color='red', alpha=0.35, label='posterior samples')
+    plt.plot(_w, samples, color='red', alpha=0.35)
+    plt.plot(_w, samples[:,0], color='red', alpha=0.35, label='posterior samples')
     posterior_mean_psd = _post_mean_r**2 + _post_mean_i**2 + np.diag(_post_cov_r + _post_cov_i)
     plt.plot(_w, posterior_mean_psd, color='black', label = '(analytical) posterior mean')
     if flag == 'show peaks':
         peaks, _  = find_peaks(posterior_mean_psd, prominence=500000)
         widths = peak_widths(posterior_mean_psd, peaks, rel_height=0.5)
+           
         plt.stem(_w[peaks],posterior_mean_psd[peaks], markerfmt='ko', label='peaks')
     
     plt.title('Sample posterior power spectral density')
@@ -255,12 +227,15 @@ def plot_power_spectral_density(model, how_many, flag=None):
     plt.legend()
     plt.xlim([min(_w), max(_w)])
     plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_psd.png')
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_psd_{EXPERIMENT}.png')
     plt.close()
     if flag == 'show peaks':
         return peaks, widths
 
+peaks, widths = plot_power_spectral_density(model, 15, 'show peaks')
+#plt.savefig("posterior_psd.pdf", bbox_inches='tight', pad_inches=0)
 
-def set_freqspace(max_freq, dimension=500):
-    _w = np.linspace(0, max_freq, dimension)
-    return _w
+print(f'Peaks are at positions {peaks*(model.w[1]-model.w[0]) }')
+print(f'and their widths are {widths[0]*(model.w[1]-model.w[0])}')
+
+
