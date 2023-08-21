@@ -72,21 +72,21 @@ MODEL = 'SGPR'
 # # Inducing Frequency Bands and GP-MultiSinc), 'cosine' (i.e., dirac delta functions in the kernel spectrum)
 # # and 'decomposed_multisinc' (i.e., corresponds to asymmetrical rectangular blocks for
 # # Inducing Frequency Bands, which essentially translates to cosine and sine transforms as the features) 
-KERNEL = 'decomposed_multisinc'
-#KERNEL = 'multisinc' 
+KERNEL = 'MixtureGaussianSpectral'
+
 #KERNEL = 'cosine'
 
 MAXFREQ = 10.
 if KERNEL =='cosine':
     N_COMPONENTS = 1
 else:
-    N_COMPONENTS = 10
+    N_COMPONENTS = 50
 MAXITER = 1000
 
 # %% [markdown]
 # # Can choose between 'rbf', 'Periodogram' or 'Neutral'
-INIT_METHOD = 'rbf'
-#INIT_METHOD = 'Periodogram' 
+#INIT_METHOD = 'rbf'
+INIT_METHOD = 'Periodogram' 
 #INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
@@ -157,34 +157,46 @@ print('upper limits')
 print(means_np + bandwidths_np * 0.5)
 
 
-if KERNEL=='decomposed_multisinc':
-    #NOTE -- we are just splitting in half the powers of each block
-    # and assign them to the co/sine rectangular blocks.
-    powers_np = [np.float64(np_float/2.) for np_float in powers_np]
-else:
-    powers_np = [np.float64(np_float) for np_float in powers_np]
+
+powers_np = [np.float64(np_float) for np_float in powers_np]
 
 print('powers_np')
 print(powers_np)
+
+def initialise_kernel(x, y):
+
+    #NOTE -- is Tobar taking just one Gaussian for the Mixture Spectral Kernel?
+
+    Nx = len(x) # number of observations
+    alpha = 0.5 / ((np.max(x) - 
+                            np.min(x))
+                            /2.)**2 # to be used for windowing function 
+    sigma = [np.std(y)] 
+    
+    gamma = 0.5 / ((np.max(x) - 
+                            np.min(x))
+                            /Nx)**2
+    gamma = np.reshape(gamma, (1,-1))
+
+    theta = 0.01
+    theta = np.reshape(theta, (1,-1))
+
+    sigma_n = np.std(y) / 10.
+    
+    return gpflow.kernels.MixtureSpectralGaussianVectorized(
+                                            means = theta,
+                                            bandwidths = gamma,
+                                            powers = sigma,
+                                            alpha = alpha)
 
 if KERNEL=='cosine':
     kern = gpflow.kernels.SpectralDiracDeltaBlock(means= means_np, 
                                                   bandwidths= bandwidths_np, 
                                                   powers=powers_np, 
                                                   alpha = 0.)
-elif KERNEL=='multisinc':
-    kern = gpflow.kernels.MultipleSpectralBlock(n_components=N_COMPONENTS, 
-                                                means= means_np, 
-                                                bandwidths= bandwidths_np, 
-                                                powers=powers_np, 
-                                                alpha=ALPHA)
-elif KERNEL=='decomposed_multisinc':
-    kern = gpflow.kernels.DecomposedMultipleSpectralBlock(n_components=N_COMPONENTS, 
-                                                          means= means_np, 
-                                                          bandwidths= bandwidths_np, 
-                                                          real_powers= powers_np, 
-                                                          img_powers = powers_np,
-                                                          alpha=ALPHA)
+elif KERNEL=='MixtureGaussianSpectral':
+    kern = initialise_kernel(X_cond, Y_cond)
+
 
 def plot_kernel_samples(ax: Axes, kernel: gpflow.kernels.SpectralKernel) -> None:
     X = np.zeros((0, 1))
@@ -212,16 +224,26 @@ def plot_kernel_prediction(
             (X_cond, Y_cond), kernel=deepcopy(kernel), noise_variance=1e-3
         )
     elif MODEL=='SGPR':
-        if KERNEL=='multsinc':
-            ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kernel)
-        elif KERNEL=='decomposed_multisinc':
-            ind_var = gpflow.inducing_variables.AsymRectangularSpectralInducingPoints(kern = kernel)
+        if KERNEL=='MixtureGaussianSpectral':
+            
+            means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(
+                    X_cond.reshape((-1,1)), 
+                    Y_cond.ravel(), 
+                    [MAXFREQ], 
+                    n_components=N_COMPONENTS, 
+                    x_interval = [X_cond.max() -  X_cond.min()]
+                    )
+            
+            ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kernel,
+                                                                                     Z = means_np.reshape((-1,)))
         model = gpflow.models.SGPR(
             data = (X_cond, Y_cond), kernel=deepcopy(kernel), inducing_variable = ind_var, noise_variance=1e-3
         )
 
     if optimise:
+        #NOTE -- be careful with these deactivations
         gpflow.set_trainable(model.likelihood, False)
+        gpflow.set_trainable(model.inducing_variable.Z, False)
         opt = gpflow.optimizers.Scipy()
         opt.minimize(model.training_loss, model.trainable_variables)
 
@@ -272,7 +294,7 @@ def make_component_spectrum(x, mean, bandwidth, variance, use_blocks=True):
                      spectral_basis(x, -mean, bandwidth, variance, use_blocks))
     
     return spectrum
-
+"""
 def plot_spectrum_blocks(
     ax: Axes, data_object,
 ) -> None:
@@ -301,7 +323,7 @@ def plot_spectrum_blocks(
         ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SymBand_'+str(_), 
                 linewidth=.8)
 
-
+"""
 def plot_kernel(
     kernel: gpflow.kernels.Kernel, *, optimise: bool = False
 ) -> None:
@@ -309,14 +331,14 @@ def plot_kernel(
         _, (samples_ax, prediction_ax, spectrum_ax) = plt.subplots(nrows=3, ncols=1, figsize=(15, 10 * 3))
         plot_kernel_samples(samples_ax, kernel)
         plot_kernel_prediction(prediction_ax, kernel, optimise=optimise)
-        plot_spectrum_blocks(spectrum_ax, data_object)
+        #plot_spectrum_blocks(spectrum_ax, data_object)
     elif MODEL=='SGPR':
         _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_ax, 
             spectrum_ax) = plt.subplots(nrows=4, ncols=1, figsize=(15, 10 * 4))
         plot_kernel_samples(samples_ax, kernel)
         plot_kernel_prediction(prediction_parametric_ax, kernel, optimise=optimise)
         plot_kernel_prediction(prediction_non_parametric_ax, kernel, optimise=optimise, parametric=False)
-        plot_spectrum_blocks(spectrum_ax, data_object)
+        #plot_spectrum_blocks(spectrum_ax, data_object)
 
     plt.tight_layout()
     plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_exploration.png')
