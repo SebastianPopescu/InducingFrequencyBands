@@ -403,7 +403,13 @@ class SpectralGaussian(AnisotropicSpectralStationary):
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) # expected shape -- [N1, N2]
        
         descaled_d = d * tf.transpose(tf.math.reciprocal(self.means))[None, :, :] # expected shape [N1, N2, D]
-        exponential_term = tf.exp(-2. * math.pi ** 2 * 
+        #Fergus version
+        #exponential_term = tf.exp(-2. * math.pi ** 2 * 
+        #                          tf.reduce_sum(tf.square(descaled_d) * 
+        #                                        tf.transpose(self.bandwidths)[None, :, :]
+        #                                        , axis=-1))
+        #Tobar version
+        exponential_term = tf.exp(- 
                                   tf.reduce_sum(tf.square(descaled_d) * 
                                                 tf.transpose(self.bandwidths)[None, :, :]
                                                 , axis=-1))

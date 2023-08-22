@@ -312,6 +312,24 @@ class SpectralSum(ReducingSpectralCombination):
     def _reduce(self) -> Callable[[Sequence[TensorType]], TensorType]:
         return tf.add_n  # type: ignore[no-any-return]
 
+    def prepare_for_vectorization(self):
+        #powers, # stands for A -- expected shape [Q, ]
+        #means, # stands for mu -- expected shape [D, Q]
+        #bandwidths, # stands for sigma -- expected shape [D, Q]
+        list_powers = []
+        list_means = []
+        list_bandwidths = []
+        for _kernel in self.kernels:
+
+            list_powers.append(_kernel.powers)
+            list_means.append(_kernel.means)
+            list_bandwidths.append(_kernel.bandwidths)
+
+        self.powers = tf.concat(list_powers, axis = 0)
+        self.means = tf.concat(list_means, axis = 0)
+        self.bandwidths = tf.concat(list_bandwidths, axis = 1)
+        self.alpha = _kernel.alpha
+
 
 class SpectralProduct(ReducingSpectralCombination):
     @property

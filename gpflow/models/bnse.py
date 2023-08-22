@@ -21,7 +21,7 @@ from ..utilities.ops import difference_matrix, batched_difference_matrix
 
 from .. import posteriors
 from ..base import InputData, MeanAndVariance, RegressionData, TensorData
-from ..kernels import Kernel, MixtureSpectralGaussianVectorized
+from ..kernels import Kernel, MixtureSpectralGaussianVectorized, MixtureSpectralGaussian
 from ..likelihoods import Gaussian
 from ..logdensities import multivariate_normal
 from ..mean_functions import MeanFunction
@@ -51,6 +51,7 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
         noise_variance: Optional[TensorData] = None,
         likelihood: Optional[Gaussian] = None,
         aim = None,
+        use_vectorized = None,
     ):
         assert (noise_variance is None) or (
             likelihood is None
@@ -67,7 +68,12 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
                 noise_variance = self.sigma_n**2
             likelihood = Gaussian(noise_variance)
         
+        self.use_vectorized = use_vectorized
         kernel = self.set_kernel()
+        if not self.use_vectorized:
+        
+            
+            kernel.prepare_for_vectorization()
         super().__init__(kernel, likelihood, mean_function, num_latent_gps=Y_data.shape[-1])
         self.data = data_input_to_tensor(data)
 
@@ -92,11 +98,19 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
 
     def set_kernel(self):
 
-        return MixtureSpectralGaussianVectorized(
-                                       means = self.theta,
-                                       bandwidths = self.gamma,
-                                       powers = self.sigma,
-                                       alpha = self.alpha)
+
+        if self.use_vectorized:
+            return MixtureSpectralGaussianVectorized(
+                                        means = self.theta,
+                                        bandwidths = self.gamma,
+                                        powers = self.sigma,
+                                        alpha = self.alpha)
+        else:
+            return MixtureSpectralGaussian(n_components=len(self.sigma),
+                                means = self.theta,
+                                bandwidths = self.gamma,
+                                powers = self.sigma,
+                                alpha = self.alpha)
 
     def initialise_kernel_hyperparams(self):
     
@@ -369,9 +383,8 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
 
         return tf.reduce_sum(Kfu_real, axis=1), tf.reduce_sum(Kfu_img, axis=1) # [M,N]
 
-
     #NOTE -- this is redundant as I can just use self.kernel(.,.)
-
+    """
     def Spec_Mix_tf(self, x, y):
         
         #Spectral Mixture Kernel.
@@ -410,7 +423,7 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
 
 
         return self.kernel.powers**2 * tf.reduce_sum(exponential_term, axis = 0) * tf.reduce_sum(cos_term, axis = 0) 
-
+    """
         
     def time_freq_covariances(self, xi, t, kernel = 'sm'):
 
