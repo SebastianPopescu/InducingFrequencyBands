@@ -304,16 +304,16 @@ def MixtureSpectralGaussian(
     bandwidths,
     powers,
 ) -> Sum:
-    """
-    A helper function to combine several block kernels.
 
-    :param n_components: How many blocks to combine.
-    :param means: (Optional) The mean frequencies, of the dimensions ``DxN``, where ``N`` is
-        the number of components, and ``D`` is the number of dimensions.
-    :param bandwidths: (Optional) How broad each spectral block is.
-    :param variances: (Optional) The variances of each block.
-    :return: TODO missing return statement
-    """
+    #A helper function to combine several block kernels.
+
+    #:param n_components: How many blocks to combine.
+    #:param means: (Optional) The mean frequencies, of the dimensions ``DxN``, where ``N`` is
+    #    the number of components, and ``D`` is the number of dimensions.
+    #:param bandwidths: (Optional) How broad each spectral block is.
+    #:param variances: (Optional) The variances of each block.
+    #:return: TODO missing return statement
+    
 
     #assert (means is None and bandwidths is None and variances is None) or (
     #    means is not None and bandwidths is not None and variances is not None
@@ -339,3 +339,82 @@ def MixtureSpectralGaussian(
     sum_kernel = SpectralSum(list_kernels)
 
     return sum_kernel
+
+
+
+
+class MixtureSpectralGaussianv2(AnisotropicSpectralStationary):
+    """The primitive kernel whose spectral density is comprised of a 
+    pair of symmetrical Gaussians."""
+
+    def __init__(self, 
+        powers, # stands for A -- expected shape [Q, ]
+        means, # stands for mu -- expected shape [D, Q]
+        bandwidths, # stands for sigma -- expected shape [D, Q]
+        active_dims=None):
+
+        super().__init__(powers=powers, 
+            means=means,
+            bandwidths=bandwidths, 
+            active_dims=active_dims)
+
+    #NOTE -- overriding inherited function from ``AnisotropicSpectralStationary''
+    def scaled_difference_matrix(self, X: TensorType, X2: Optional[TensorType] = None) -> tf.Tensor:
+        """
+        Returns [(X - X2ᵀ) / ℓ]. If X has shape [..., N, D] and
+        X2 has shape [..., M, D], the output will have shape [..., N, M, D].
+        """
+        X_scaled = tf.transpose(self.scale(X), [2,0,1]) # [Q, N1, D]
+
+        if X2 is None:
+            X2 = X
+        X2_scaled = tf.transpose(self.scale(X2), [2,0,1]) # [Q, N2, D]
+
+
+        diff = batched_difference_matrix(X_scaled, X2_scaled) # [Q, N1, N2, D]
+
+        return diff
+        
+
+    #NOTE -- overriding inherited function from ``SpectralStationary''
+    def scale(self, X: TensorType) -> TensorType:
+        
+        """
+        :param X: expected shape [N, D]
+        :param self.means: expected shape [D, Q], Q -- are the number of mixtures for the Mixture Spectral Kernel.
+        :return: expected shape [N, D, Q]
+        """
+
+        X_scaled = X[...,tf.newaxis] * self.means[tf.newaxis,...] if X is not None else X # [N, D, Q]
+
+        return X_scaled
+
+
+    def K_d(self, d):
+        """
+        The covariance associated with a spectral density given by a Gaussian.
+        :param d: expected shape [Q, N1, N2, D], where
+        Q is the number of mixtures for the Mixture Spectral Kernel.
+
+        #TODO -- update the documentation here
+        :param d: The scaled Euclidean distance, which is why the lengthscale term appears inaxis
+            the exponential term rather than the cosine term.
+            For further details, see equations 6-11 of
+            [Gaussian Process Kernels for Pattern Discovery and Extrapolation]
+            (https://arxiv.org/abs/1302.4245).
+        """
+
+        cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) # expected shape -- [Q, N1, N2]
+
+        # means - [D, Q]       
+        descaled_d = d * tf.transpose(tf.math.reciprocal(self.means)
+                                      )[:, tf.newaxis, tf.newaxis, :] # expected shape [Q, N1, N2, D]
+
+        # bandwidths - [D, Q]
+        exponential_term = tf.exp(-
+                                  tf.reduce_sum(tf.square(descaled_d) * 
+                                                tf.transpose(self.bandwidths)[:, tf.newaxis, tf.newaxis, :]
+                                                , axis=-1)) # expected shape [Q, N1, N2]
+
+        # powers - [Q, ]
+        return tf.reduce_sum(self.powers[:, tf.newaxis, tf.newaxis]**2 * cos_term * exponential_term, axis = 0) # expected shape [N1, N2]

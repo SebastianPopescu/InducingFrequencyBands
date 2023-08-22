@@ -50,6 +50,7 @@ from .spectral import (
     MultipleSpectralBlock, 
     SpectralBlock, 
     MixtureSpectralGaussian,
+    MixtureSpectralGaussianv2,
     SummedSpectralBlock, 
     SpectralDiracDeltaBlock
 )
@@ -67,6 +68,7 @@ Bias = Constant
 RBF = SquaredExponential
 
 __all__ = [
+    "MixtureSpectralGaussianv2",
     "AnisotropicStationary",
     "ArcCosine",
     "Bias",
