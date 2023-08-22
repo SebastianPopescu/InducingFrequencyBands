@@ -342,7 +342,7 @@ def MixtureSpectralGaussian(
 
 
 
-
+#NOTE -- this is a vectorized version
 class MixtureSpectralGaussianv2(AnisotropicSpectralStationary):
     """The primitive kernel whose spectral density is comprised of a 
     pair of symmetrical Gaussians."""
@@ -369,7 +369,6 @@ class MixtureSpectralGaussianv2(AnisotropicSpectralStationary):
         if X2 is None:
             X2 = X
         X2_scaled = tf.transpose(self.scale(X2), [2,0,1]) # [Q, N2, D]
-
 
         diff = batched_difference_matrix(X_scaled, X2_scaled) # [Q, N1, N2, D]
 
