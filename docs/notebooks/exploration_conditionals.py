@@ -73,8 +73,8 @@ Y_cond = func(X_cond) + 0.2 * rng.randn(N, 1)  # Noisy Y values
 # %% [markdown]
 # # Can choose between 'GPR' and 'SGPR'
 
-#MODEL = 'SGPR'
-MODEL = 'GPR'
+MODEL = 'SGPR'
+#MODEL = 'GPR'
 
 # %% [markdown]
 # # 'MixtureGaussianSpectral' (i.e., corresponds to symmetrical 
@@ -89,7 +89,7 @@ if MODEL == 'GPR':
     N_COMPONENTS = 10
 else:
     N_COMPONENTS = 50
-MAXITER = 50
+MAXITER = 100
 
 # %% [markdown]
 # # Can choose between 'rbf', 'Periodogram' or 'Neutral'
@@ -99,7 +99,6 @@ INIT_METHOD = 'Periodogram'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
 ALPHA = 1e-12
-
 
 # NOTE -- in this case this initializes the underlying SMK for Kff time-domain 
 means_np, bandwidths_np, powers_np = np_disjoint_initial_components([MAXFREQ], 
@@ -170,9 +169,10 @@ if MODEL=='GPR':
                                                 alpha = alpha)
                                                 
 else:
+    # to be used for windowing function
     alpha = 0.5 / ((np.max(X_cond) - 
                                 np.min(X_cond))
-                                /2.)**2 # to be used for windowing function 
+                                /2.)**2  
 
     kern = gpflow.kernels.MixtureSpectralGaussianVectorized(
                                                 means = means_np,
@@ -204,24 +204,23 @@ elif MODEL=='SGPR':
                                 inducing_variable = ind_var, 
                                 noise_variance=1e-3)
 
-optimise = True
+optimise = False
 if optimise:
     #NOTE -- be careful with these deactivations
     #gpflow.set_trainable(model.likelihood, False)
-    #gpflow.set_trainable(model.inducing_variable.Z, False)
-    opt = gpflow.optimizers.Scipy()
-    opt_logs = opt.minimize(
-        model.training_loss, model.trainable_variables, 
-        options=dict(maxiter=MAXITER)
-    )
+    if MODEL=='SGPR':
+        gpflow.set_trainable(model.inducing_variable.Z, False)
+    #opt = gpflow.optimizers.Scipy()
+    #opt_logs = opt.minimize(
+    #    model.training_loss, model.trainable_variables, 
+    #    options=dict(maxiter=MAXITER)
+    #)
 
-    """
     opt_logs = gpflow.optimizers.Scipy().minimize(
         model.training_loss,
         variables=model.trainable_variables,
         method="l-bfgs-b",
         options={"disp": True, "maxiter": MAXITER})
-    """
 
 def plot_kernel_samples(ax: Axes, kernel: gpflow.kernels.SpectralKernel) -> None:
     X = np.zeros((0, 1))
@@ -338,6 +337,12 @@ def plot_spectrum_blocks(
 
         ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SymBand_'+str(_), 
                 linewidth=.8)
+
+    if MODEL=='SGPR':
+        Z_np = model.inducing_variable.Z.numpy()
+        ax.scatter(Z_np, np.zeros_like(Z_np),
+                s=250, marker="*", alpha=0.95, c = 'cyan',
+                linewidth=1, label = 'Inducing Points')
 
 
 def plot_kernel(

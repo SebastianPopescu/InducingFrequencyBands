@@ -507,7 +507,6 @@ class MixtureSpectralGaussianVectorized(AnisotropicSpectralStationary):
 
         return X_scaled
 
-
     def K_d(self, d):
         """
         The covariance associated with a spectral density given by a Gaussian.

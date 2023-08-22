@@ -76,7 +76,7 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
         self.kern = kern
 
         if not isinstance(Z, (tf.Variable, tfp.util.TransformedVariable)):
-            Z = Parameter(Z)
+            Z = Parameter(Z, transform=positive())
         self.Z = Z
 
     @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
