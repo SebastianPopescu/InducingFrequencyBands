@@ -129,8 +129,14 @@ print(powers_np)
 kern = gpflow.kernels.MixtureSpectralGaussian(n_components= N_COMPONENTS , 
                                               powers = powers_np, 
                                               means = means_np, 
-                                              bandwidths = bandwidths_np)
+                                              bandwidths = bandwidths_np,)
 
+"""
+kern = gpflow.kernels.MixtureSpectralGaussianv2( 
+                                              powers = powers_np, 
+                                              means = means_np, 
+                                              bandwidths = bandwidths_np,)
+"""
 fig, ax = plt.subplots(1,1, figsize=(5, 2.5))
 
 for _ in range(N_COMPONENTS):
@@ -194,16 +200,19 @@ ax = data_object.plot_spectrum(maxfreq=MAXFREQ)
 
 for _ in range(N_COMPONENTS):
 
-    spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
-        tf.convert_to_tensor(kern.kernels[_].means).numpy().ravel(), 
-        tf.convert_to_tensor(kern.kernels[_].bandwidths).numpy().ravel(), 
-        tf.convert_to_tensor(kern.kernels[_].powers).numpy().ravel(), 
-        use_blocks = False)
+    if isinstance(kern, gpflow.kernels.MixtureSpectralGaussian):
+        spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
+            tf.convert_to_tensor(kern.kernels[_].means).numpy().ravel(), 
+            tf.convert_to_tensor(kern.kernels[_].bandwidths).numpy().ravel(), 
+            tf.convert_to_tensor(kern.kernels[_].powers).numpy().ravel(), 
+            use_blocks = False)
+    elif isinstance(kern, gpflow.kernels.MixtureSpectralGaussianv2):
 
-
-    print(tf.convert_to_tensor(kern.kernels[_].means).numpy())
-    print(tf.convert_to_tensor(kern.kernels[_].powers).numpy())
-    print(tf.convert_to_tensor(kern.kernels[_].bandwidths).numpy())
+        spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
+            tf.convert_to_tensor(kern.means[:,_]).numpy().ravel(), 
+            tf.convert_to_tensor(kern.bandwidths[:,_]).numpy().ravel(), 
+            tf.convert_to_tensor(kern.powers[_]).numpy().ravel(), 
+            use_blocks = False)
 
     ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), label='SB_'+str(_), linewidth=.8)
 
