@@ -61,7 +61,7 @@ signal = signal.reshape((-1,1))
 MODEL = 'GPR'
 KERNEL = 'SpecMixGaus'
 N_FREQS = 500
-model = BNSE(data = (time, signal))
+model = BNSE(data = (time, signal), use_vectorized=True)
 model.set_labels(time_label, signal_label)
 
 if EXPERIMENT=='hr1':
@@ -192,7 +192,7 @@ plot_freq_posterior_imag(model=model)
 #plt.savefig("posterior_spectrum_imag.pdf", bbox_inches='tight', pad_inches=0)
 
 
-#TODO -- need to fix this at one point
+#TODO -- need to fix the sampling
 def plot_power_spectral_density(model, how_many, flag=None):
     #posterior moments for frequency
     plt.figure(figsize=(18,6))
