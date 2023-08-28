@@ -389,6 +389,24 @@ class SGPR_deprecated(SGPRBase_deprecated):
 
         return self.mean_function(Xnew), var
 
+    #FIXME -- make this work eventually
+    #@inherit_check_shapes
+    def get_covariances(
+        self, full_cov: bool = False, full_output_cov: bool = False
+    ):
+        """
+        Compute the mean and variance of the latent function at some new points
+        Xnew. For a derivation of the terms in here, see the associated SGPR
+        notebook.
+        """
+        
+        X_data, Y_data = self.data
+        
+        kuf = Kuf(self.inducing_variable, self.kernel, X_data)
+        kuu = Kuu(self.inducing_variable, self.kernel, jitter=default_jitter())
+
+        return kuf, kuu
+
 
     #FIXME -- make this work eventually
     #@inherit_check_shapes
