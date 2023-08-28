@@ -14,10 +14,7 @@
 # ---
 
 # %% [markdown]
-# # Stochastic Variational Inference for scalability with SVGP
-
-# %% [markdown]
-# One of the main criticisms of Gaussian processes is their scalability to large datasets. In this notebook, we illustrate how to use the state-of-the-art Stochastic Variational Gaussian Process (SVGP) (*Hensman, et. al. 2013*) to overcome this problem.
+# # Spectral Mixture Kernel GP on toy sine data.
 
 # %%
 # %matplotlib inline
@@ -90,8 +87,6 @@ Xt = np.linspace(-3.5, 3.5, 200)[:, None]
 Yt = func(Xt)
 _ = plt.plot(Xt, Yt, c="k")
 
-
-
 data_object = gpflow.data.Data(X = X, Y = Y)
 NYQUIST_FREQ = data_object.get_nyquist_estimation()
 
@@ -135,6 +130,11 @@ if not VECTORIZED:
                                                 powers = powers_np, 
                                                 means = means_np, 
                                                 bandwidths = bandwidths_np,)
+    kern_vec = gpflow.kernels.MixtureSpectralGaussianv2( 
+                                                powers = powers_np, 
+                                                means = means_np, 
+                                                bandwidths = bandwidths_np,)
+
 else:
 
     kern = gpflow.kernels.MixtureSpectralGaussianv2( 
@@ -159,11 +159,28 @@ plt.close()
 
 m = gpflow.models.GPR( data = (X, Y), kernel = kern)
 
+m_vec = gpflow.models.GPR( data = (X, Y), kernel = kern_vec)
+
+
+Kuu = m.get_cov()
+Kuu_vec = m_vec.get_cov()
+
+
+Kuu = Kuu.numpy()
+Kuu_vec = Kuu_vec.numpy()
+
+print('troubleshooting -- should be zero matrix')
+print(Kuu - Kuu_vec)
+
 opt = gpflow.optimizers.Scipy()
 opt_logs = opt.minimize(
     m.training_loss, m.trainable_variables, options=dict(maxiter=MAXITER)
 )
 
+opt2 = gpflow.optimizers.Scipy()
+opt_logs2 = opt2.minimize(
+    m_vec.training_loss, m_vec.trainable_variables, options=dict(maxiter=MAXITER)
+)
 
 # %% [markdown]
 # Finally, we plot the model's predictions.
@@ -187,14 +204,35 @@ def plot(title=""):
         alpha=0.6,
         lw=1.5,
     )
-
     plt.legend(loc="lower right")
-
 
 plot("Predictions after training")
 plt.savefig('./figures/gp_smk_toy_data.png')
 plt.close()
 
+
+# %%
+def plot_vec(title=""):
+    plt.figure(figsize=(12, 4))
+    plt.title(title)
+    pX = np.linspace(-3.5, 3.5, 200)[:, None]  # Test locations
+    pY, pYv = m_vec.predict_y(pX)  # Predict Y values at test locations
+    plt.plot(X, Y, "x", label="Training points", alpha=0.2)
+    (line,) = plt.plot(pX, pY, lw=1.5, label="Mean of predictive posterior")
+    col = line.get_color()
+    plt.fill_between(
+        pX[:, 0],
+        (pY - 2 * pYv ** 0.5)[:, 0],
+        (pY + 2 * pYv ** 0.5)[:, 0],
+        color=col,
+        alpha=0.6,
+        lw=1.5,
+    )
+    plt.legend(loc="lower right")
+
+plot_vec("Predictions after training")
+plt.savefig('./figures/gp_smk_vec_toy_data.png')
+plt.close()
 
 # Periodogram and optimized symmetrical rectangles
 
@@ -225,3 +263,34 @@ for _ in range(N_COMPONENTS):
 
 plt.savefig('./figures/gp_smk_toy_data_periodogram.png')
 plt.close()
+
+
+ax = data_object.plot_spectrum(maxfreq=MAXFREQ)
+
+
+for _ in range(N_COMPONENTS):
+
+    if isinstance(kern_vec, gpflow.kernels.MixtureSpectralGaussianv2):
+
+        spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
+            tf.convert_to_tensor(kern_vec.means[:,_]).numpy().ravel(), 
+            tf.convert_to_tensor(kern_vec.bandwidths[:,_]).numpy().ravel(), 
+            tf.convert_to_tensor(kern_vec.powers[_]).numpy().ravel(), 
+            use_blocks = False)
+
+    else:
+        spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
+            tf.convert_to_tensor(kern_vec.kernels[_].means).numpy().ravel(), 
+            tf.convert_to_tensor(kern_vec.kernels[_].bandwidths).numpy().ravel(), 
+            tf.convert_to_tensor(kern_vec.kernels[_].powers).numpy().ravel(), 
+            use_blocks = False)
+
+
+    ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), label='SB_'+str(_), linewidth=.8)
+
+plt.savefig('./figures/gp_smk_vec_toy_data_periodogram.png')
+plt.close()
+
+
+
+
