@@ -61,7 +61,7 @@ signal = signal.reshape((-1,1))
 MODEL = 'GPR'
 KERNEL = 'SpecMixGaus'
 N_FREQS = 500
-model = BNSE(data = (time, signal), use_vectorized=True)
+model = BNSE(data = (time, signal), use_vectorized=False)
 model.set_labels(time_label, signal_label)
 
 if EXPERIMENT=='hr1':
