@@ -102,11 +102,14 @@ DELTAS = 1e-1
 ALPHA = 1e-12
 
 # NOTE -- in this case this initializes the underlying SMK for Kff time-domain 
-#means_np, bandwidths_np, powers_np = np_disjoint_initial_components([MAXFREQ], 
-#                                                                    n_components=N_COMPONENTS, 
-#                                                                    x_interval = [X_cond.max() -  X_cond.min()])
-
-means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(
+#NEUTRAL = True # Initializes SMK in a non-informative manner
+NEUTRAL = False # Initializes SMK to be close to the Periodogram of the training data
+if NEUTRAL:
+    means_np, bandwidths_np, powers_np = np_disjoint_initial_components([MAXFREQ], 
+                                                                    n_components=N_COMPONENTS, 
+                                                                    x_interval = [X_cond.max() -  X_cond.min()])
+else:
+    means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(
         X_cond.reshape((-1,1)), 
         Y_cond.ravel(), 
         [MAXFREQ], 
@@ -214,7 +217,7 @@ elif MODEL=='SGPR':
                                 inducing_variable = ind_var, 
                                 noise_variance=1e-3)
 
-#optimise = False
+#optimise = True
 optimise = False
 
 if optimise:
