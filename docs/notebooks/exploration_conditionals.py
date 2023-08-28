@@ -89,7 +89,8 @@ if MODEL == 'GPR':
     N_COMPONENTS = 10
 else:
     N_COMPONENTS = 50
-MAXITER = 100
+MAXITER = 25
+UPSCALEALPHA = 1.0
 
 # %% [markdown]
 # # Can choose between 'rbf', 'Periodogram' or 'Neutral'
@@ -101,9 +102,17 @@ DELTAS = 1e-1
 ALPHA = 1e-12
 
 # NOTE -- in this case this initializes the underlying SMK for Kff time-domain 
-means_np, bandwidths_np, powers_np = np_disjoint_initial_components([MAXFREQ], 
-                                                                    n_components=N_COMPONENTS, 
-                                                                    x_interval = [X_cond.max() -  X_cond.min()])
+#means_np, bandwidths_np, powers_np = np_disjoint_initial_components([MAXFREQ], 
+#                                                                    n_components=N_COMPONENTS, 
+#                                                                    x_interval = [X_cond.max() -  X_cond.min()])
+
+means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(
+        X_cond.reshape((-1,1)), 
+        Y_cond.ravel(), 
+        [MAXFREQ], 
+        n_components=N_COMPONENTS, 
+        x_interval = [X_cond.max() -  X_cond.min()]
+        )
 
 X_cond = X_cond.reshape((-1, 1))
 Y_cond = Y_cond.reshape((-1, 1))
@@ -173,6 +182,7 @@ else:
     alpha = 0.5 / ((np.max(X_cond) - 
                                 np.min(X_cond))
                                 /2.)**2  
+    alpha = UPSCALEALPHA * alpha
 
     kern = gpflow.kernels.MixtureSpectralGaussianVectorized(
                                                 means = means_np,
@@ -204,7 +214,9 @@ elif MODEL=='SGPR':
                                 inducing_variable = ind_var, 
                                 noise_variance=1e-3)
 
+#optimise = False
 optimise = False
+
 if optimise:
     #NOTE -- be careful with these deactivations
     #gpflow.set_trainable(model.likelihood, False)
@@ -366,3 +378,32 @@ def plot_kernel(
     plt.close()
 
 plot_kernel(model, kern, optimise=False)
+
+
+def plot_covariance(model):
+    """
+    #TODO -- write documentation
+    """
+    _kuf, _kuu = model.get_covariances()
+
+    print(_kuf)
+    print(_kuu)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3, 10))
+
+    # Kuf
+    ax1.matshow(_kuf.numpy(), aspect="auto")
+    ax1.set_yticklabels([])
+    ax1.set_xticklabels([])
+    ax1.set_title("Kuf")
+
+    # Kuu
+    ax2.matshow(_kuu.numpy(), aspect="auto")
+    ax2.set_yticklabels([])
+    ax2.set_xticklabels([])
+    ax2.set_title("Kuu")
+
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_covariances.png')
+    plt.close()
+
+plot_covariance(model)
