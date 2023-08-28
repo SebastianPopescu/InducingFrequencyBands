@@ -290,9 +290,9 @@ class SpectralGaussian(AnisotropicSpectralStationary):
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) # expected shape -- [N1, N2]
        
         descaled_d = d * tf.transpose(tf.math.reciprocal(self.means))[None, :, :] # expected shape [N1, N2, D]
-        #Fergus version
+        #TODO -- Fergus version -- need to check the original Wilson paper.
         #exponential_term = tf.exp(-2. * math.pi ** 2 * tf.reduce_sum(tf.square(descaled_d) * tf.transpose(self.bandwidths)[None, :, :], axis=-1))
-        #Tobar version
+        #Tobar version -- this is the formula from the BNSE paper
         exponential_term = tf.exp(- tf.reduce_sum(tf.square(descaled_d) * tf.transpose(self.bandwidths)[None, :, :], axis=-1))
 
         return self.powers * cos_term * exponential_term
@@ -339,7 +339,6 @@ def MixtureSpectralGaussian(
     sum_kernel = SpectralSum(list_kernels)
 
     return sum_kernel
-
 
 
 #NOTE -- this is a vectorized version

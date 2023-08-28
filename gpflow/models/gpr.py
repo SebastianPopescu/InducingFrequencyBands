@@ -106,6 +106,17 @@ class GPR_deprecated(GPModel, InternalDataTrainingLossMixin):
         log_prob = multivariate_normal(Y, m, L)
         return tf.reduce_sum(log_prob)
 
+    def get_cov(self) -> tf.Tensor:
+        r"""
+        Returns the covariance of the training data.
+
+        """
+        X, Y = self.data
+        K = self.kernel(X)
+        ks = add_likelihood_noise_cov(K, self.likelihood, X)
+
+        return ks
+
     @inherit_check_shapes
     def predict_f(
         self, Xnew: InputData, full_cov: bool = False, full_output_cov: bool = False
