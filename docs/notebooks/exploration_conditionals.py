@@ -61,8 +61,6 @@ def func(x):
 
 N = 500  # Number of training observations
 
-
-
 EXPERIMENT = 'toy_sine'
 #EXPERIMENT = 'hr1'
 #EXPERIMENT = 'hr2'
@@ -259,14 +257,14 @@ elif MODEL=='SGPR':
                                 inducing_variable = ind_var, 
                                 noise_variance=1e-3)
 
-#optimise = True
-optimise = False
+optimise = True
+#optimise = False
 
 if optimise:
     #NOTE -- be careful with these deactivations
     #gpflow.set_trainable(model.likelihood, False)
-    if MODEL=='SGPR':
-        gpflow.set_trainable(model.inducing_variable.Z, False)
+    #if MODEL=='SGPR':
+    #    gpflow.set_trainable(model.inducing_variable.Z, False)
     #opt = gpflow.optimizers.Scipy()
     #opt_logs = opt.minimize(
     #    model.training_loss, model.trainable_variables, 
