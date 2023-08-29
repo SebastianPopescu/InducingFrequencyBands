@@ -289,6 +289,32 @@ class SGPR_deprecated(SGPRBase_deprecated):
 
         return const + logdet + quad
 
+
+    def get_complex_gp_covariances(self, kernel = 'sm'):
+
+        r"""
+        Local Spectrum \mathcal{F}_{c}\left(  \xi \right) 
+        is a complex GP, meaning it posses both a covariance
+        and a pseudo-covariance.
+
+        #TODO -- find eqns in paper.
+        K and P correspond to equations ...
+
+        Real and Imaginary covariances correspond to equations ... 
+        """
+
+        if kernel == 'sm':
+            
+            # Spectrum covariance
+            # 0.5 scaling is due to missing 0.5 scaling in ``spectrum_covariance''          
+            K = 0.5*(spectrum_covariance(self.inducing_variable.Z, self.inducing_variable.Z, self.kernel.means, self.kernel) + 
+                    spectrum_covariance(self.inducing_variable.Z, self.inducing_variable.Z, -self.kernel.means, self.kernel))
+            # Spectrum pseudo-covariance
+            P = 0.5*(spectrum_covariance(self.inducing_variable.Z, -self.inducing_variable.Z, self.kernel.means, self.kernel) + 
+                    spectrum_covariance(self.inducing_variable.Z, -self.inducing_variable.Z, -self.kernel.means, self.kernel))
+
+        return P,K
+
     @inherit_check_shapes
     def predict_f(
         self, Xnew: InputData, full_cov: bool = False, full_output_cov: bool = False
@@ -493,6 +519,53 @@ class SGPR_deprecated(SGPRBase_deprecated):
         )
 
         return mu, cov
+
+
+
+
+def spectrum_covariance(xi1, xi2, theta, kernel):
+
+    r"""
+    Computes K_{ff}\left( \xi, \xi' \right).
+
+    Corresponds to equation 17 from BNSE paper.
+
+    xi1 # [M,]
+    xi2 # [M',]
+    """
+
+    """
+    magnitude = np.pi * sigma**2 / (np.sqrt(alpha*(alpha + 2*gamma)))
+    return magnitude * np.exp(-np.pi**2/(2*alpha)*outersum(x,-y)**2 - 2*np.pi*2/(alpha + 2*gamma)*(outersum(x,y)/2-theta)**2)
+    """
+
+    #NOTE -- this will only work for 1D data!
+    _alpha = tf.reshape(kernel.alpha, [-1,]) # [1,]
+    _gamma = tf.reshape(kernel.bandwidths, [-1,]) # [Q,]
+    _sigma = tf.reshape(kernel.powers, [-1,]) # [Q,]
+    _theta = tf.reshape(theta, [-1,]) # [Q,]
+
+    _pi = np.pi
+
+    magnitude = _pi * _sigma**2 / (tf.sqrt(_alpha * (_alpha + 2.*_gamma))) # [Q,]
+    magnitude = magnitude[tf.newaxis, :, tf.newaxis] # [1, Q, 1]
+
+    Kxi_xi = tf.math.exp(-_pi**2/(2.*_alpha[tf.newaxis, :, tf.newaxis]) * #  [1, 1, 1]
+                            tf.square(outersum(xi1,-xi2))[:,tf.newaxis,:] # [M, 1, M']
+                            ) # [M, 1, M']
+    Kxi_xi *= tf.math.exp( - 2.*_pi**2/
+                            (_alpha + 2.*_gamma)[tf.newaxis, :, tf.newaxis] # [1, Q, 1]
+                            * tf.square(outersum(xi1,xi2)[:,tf.newaxis,:]/2. # [M, 1, M']
+                                        -tf.reshape(_theta,[1,-1,1]) # [1, Q, 1]
+                                        ) # [M, Q, M']
+                            ) # [M, Q, M']
+    
+    return tf.reduce_sum(magnitude * Kxi_xi, axis=1) # [M, M']
+
+
+def outersum(a, b):
+
+    return tf.reshape(a,[-1,1]) + tf.reshape(b,[1,-1])
 
 
 class GPRFITC(SGPRBase_deprecated):

@@ -247,6 +247,7 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
         Real and Imaginary covariances correspond to equations ... 
         """
         
+        
         if kernel == 'sm':
             N = len(x)
 
@@ -265,6 +266,38 @@ class BNSE(TimeSpectrumGPModel, InternalDataTrainingLossMixin):
 
         return real_cov, imag_cov
     
+
+    def get_complex_gp_covariances(self, kernel = 'sm'):
+
+        r"""
+        Local Spectrum \mathcal{F}_{c}\left(  \xi \right) 
+        is a complex GP, meaning it posses both a covariance
+        and a pseudo-covariance.
+
+        #TODO -- find eqns in paper.
+        K and P correspond to equations ...
+
+        Real and Imaginary covariances correspond to equations ... 
+        """
+    
+        x = self.w
+        y = self.w
+
+        if kernel == 'sm':
+            N = len(x)
+
+            # Spectrum covariance
+            # 0.5 scaling is due to missing 0.5 scaling in ``spectrum_covariance''          
+            K = 0.5*(self.spectrum_covariance(x, y, self.kernel.means) + 
+                    self.spectrum_covariance(x, y, -self.kernel.means))
+            # Spectrum pseudo-covariance
+            P = 0.5*(self.spectrum_covariance(x, -y, self.kernel.means) + 
+                    self.spectrum_covariance(x, -y, -self.kernel.means))
+
+        return P,K
+
+
+
     def spectrum_covariance(self, xi1, xi2, theta):
 
         r"""

@@ -130,7 +130,7 @@ if MODEL == 'GPR':
 else:
     N_COMPONENTS = 50
 MAXITER = 25
-UPSCALEALPHA = 1.0
+UPSCALEALPHA = 50.0
 
 # %% [markdown]
 # # Can choose between 'rbf', 'Periodogram' or 'Neutral'
@@ -257,8 +257,8 @@ elif MODEL=='SGPR':
                                 inducing_variable = ind_var, 
                                 noise_variance=1e-3)
 
-optimise = True
-#optimise = False
+#optimise = True
+optimise = False
 
 if optimise:
     #NOTE -- be careful with these deactivations
@@ -450,3 +450,33 @@ def plot_covariance(model):
     plt.close()
 
 plot_covariance(model)
+
+
+
+def plot_complex_gp_covariances(model):
+    """
+    #TODO -- write documentation
+    """
+    _pcov, _cov = model.get_complex_gp_covariances()
+
+    print(_pcov)
+    print(_cov)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3, 10))
+
+    # Pseudo-covariance local spectrum \mathcal{F}_{c}(xi,xi') -- Complex GP
+    ax1.matshow(_pcov.numpy(), aspect="auto")
+    ax1.set_yticklabels([])
+    ax1.set_xticklabels([])
+    ax1.set_title("Pseudo-covariance")
+
+    # Covariance local spectrum \mathcal{F}_{c}(xi,xi') -- Complex GP
+    ax2.matshow(_cov.numpy(), aspect="auto")
+    ax2.set_yticklabels([])
+    ax2.set_xticklabels([])
+    ax2.set_title("Covariance")
+
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_complex_gp_covariances.png')
+    plt.close()
+
+plot_complex_gp_covariances(model)
