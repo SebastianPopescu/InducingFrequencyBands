@@ -47,11 +47,12 @@ from .inducing_variables import (
     InducingVariables,
     SeparateIndependentInducingVariables,
     SharedIndependentInducingVariables,
-    AsymRectangularSpectralInducingPoints,
-    SymRectangularSpectralInducingPoints
+    SymRectangularSpectralInducingPoints,
+    SymRectangularDiracDeltaSpectralInducingPoints
+
 )
 
-from .kernels import Kernel, MultipleSpectralBlock, DecomposedMultipleSpectralBlock
+from .kernels import Kernel, MultipleSpectralBlock, MultipleDiracDeltaSpectralBlock
 from .likelihoods import Gaussian
 from .mean_functions import MeanFunction
 from .utilities import Dispatcher, add_likelihood_noise_cov, assert_params_false
@@ -1057,9 +1058,9 @@ def _get_posterior_base_spectral_case(
     # independent single output
     return IndependentPosteriorSingleOutput
 
-@get_posterior_class.register(MultipleSpectralBlock, AsymRectangularSpectralInducingPoints)
+@get_posterior_class.register(MultipleDiracDeltaSpectralBlock, SymRectangularDiracDeltaSpectralInducingPoints)
 def _get_posterior_base_spectral_case(
-    kernel: DecomposedMultipleSpectralBlock, inducing_variable: AsymRectangularSpectralInducingPoints
+    kernel: MultipleDiracDeltaSpectralBlock, inducing_variable: SymRectangularDiracDeltaSpectralInducingPoints
 ) -> Type[BasePosterior]:
     # independent single output
     return IndependentPosteriorSingleOutput

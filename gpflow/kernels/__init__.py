@@ -48,11 +48,10 @@ from .stationaries import (  # isort:skip
 
 from .spectral import (
     MultipleSpectralBlock, 
-    DecomposedMultipleSpectralBlock,
-    DecomposedMultipleDiracSpectralBlock,
     SpectralBlock, 
     MixtureSpectralGaussian,
-    SpectralDiracDeltaBlock
+    SpectralDiracDeltaBlock,
+    MultipleDiracDeltaSpectralBlock,
 )
 
 from .spectral_stationaries import (
@@ -115,10 +114,9 @@ __all__ = [
     "MixtureSpectralGaussian",
     "IsotropicSpectralStationary",
     "AnisotropicSpectralStationary",
-    "DecomposedAnisotropicSpectralStationary",
     "SpectralKernel",
     "SpectralSum",
     "SpectralProduct",
     "SpectralDiracDeltaBlock",
-    "DecomposedMultipleDiracSpectralBlock",
+    "MultipleDiracDeltaSpectralBlock",
 ]

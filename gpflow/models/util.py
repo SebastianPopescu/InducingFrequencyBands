@@ -24,8 +24,7 @@ from ..inducing_variables import (
     InducingPoints, 
     InducingVariables, 
     SymRectangularSpectralInducingPoints, 
-    AsymRectangularSpectralInducingPoints,
-    AsymDiracSpectralInducingPoints,
+    SymRectangularDiracDeltaSpectralInducingPoints,
 )
 from .model import BayesianModel
 from .training_mixins import Data, ExternalDataTrainingLossMixin
@@ -42,9 +41,7 @@ def inducingpoint_wrapper(inducing_variable: InducingVariablesLike) -> InducingV
     
     if isinstance(inducing_variable, SymRectangularSpectralInducingPoints):
         pass
-    elif isinstance(inducing_variable, AsymRectangularSpectralInducingPoints):
-        pass
-    elif isinstance(inducing_variable, AsymDiracSpectralInducingPoints):
+    elif isinstance(inducing_variable, SymRectangularDiracDeltaSpectralInducingPoints):
         pass
     elif not isinstance(inducing_variable, InducingVariables):
         inducing_variable = InducingPoints(inducing_variable)

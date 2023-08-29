@@ -4,9 +4,7 @@ from .inducing_variables import SpectralInducingPoints, InducingPoints, Inducing
 from .spectral_inducing_variables import (
     SpectralInducingVariables, 
     SymRectangularSpectralInducingPoints, 
-    AsymRectangularSpectralInducingPoints, 
-    AsymDiracSpectralInducingPoints,
-    AsymRectangularSpectralInducingPointsSimpleKuu,
+    SymRectangularDiracDeltaSpectralInducingPoints,
 )
 from .multioutput import (
     FallbackSeparateIndependentInducingVariables,
@@ -43,7 +41,5 @@ __all__ = [
     "SharedIndependentSpectralInducingVariables",
     "SpectralInducingVariables", 
     "SymRectangularSpectralInducingPoints",
-    "AsymRectangularSpectralInducingPoints",
-    "AsymRectangularSpectralInducingPointsSimpleKuu",
-    "AsymDiracSpectralInducingPoints",
+    "SymRectangularDiracDeltaSpectralInducingPoints"
 ]

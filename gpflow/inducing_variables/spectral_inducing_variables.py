@@ -89,25 +89,29 @@ class RectangularSpectralInducingPointsBase(SpectralInducingVariables):
         return tuple(shape) + (1,)
 
 
+
+class SymRectangularDiracDeltaSpectralInducingPoints(RectangularSpectralInducingPointsBase):
+    """
+    Real-space (in output space) "spectral" inter-domain inducing points with a PSD 
+    given by symmetrical Dirac Delta rectangles. 
+    
+    Corresponding kernel is the multi cosine kernel.
+    """
+
+    @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
+    @check_shapes(
+        "return: []",
+    )
+    def num_inducing(self) -> Optional[tf.Tensor]:
+        return self.kern.n_components * 2
+
+
 class SymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
     """
     Real-space (in output space) "spectral" inter-domain inducing points with a PSD 
-    given by symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
-    """
-
-
-class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase):
-    """
-    Real-space (in output space) "spectral" inter-domain inducing points with a PSD 
-    given by asymmetrical rectangles. Corresponding kernel is the multi sinc kernel,
-    where the powers of the individual sinc kernels stem from the summation of powers
-    of the asymetrical rectangular blocks corresponding to the cosine and sine transform,
-    respectively.
-
-    In this case we use the following Dirac Delta approximations to convolution operations:
-    - Kuu: Inner Convolution Operation
-    - Kuf: Inner Convolution Operation
+    given by symmetrical rectangles. 
     
+    Corresponding kernel is the multi sinc kernel.
     """
 
     @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
@@ -115,37 +119,6 @@ class AsymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBas
         "return: []",
     )
     def num_inducing(self) -> Optional[tf.Tensor]:
-        #NOTE -- this is the case when we only consider positive frequencies
-        #return self.kern.n_components * 2
-        return self.kern.n_components * 4
-    
-class AsymRectangularSpectralInducingPointsSimpleKuu(AsymRectangularSpectralInducingPoints):
-    """
-    Same as parent class.
-    
-    In this case we use the following Dirac Delta approximations to convolution operations:
-    - Kuu: Inner Convolution Operation & other Gaussian 
-    - Kuf: Inner Convolution Operation
-
-    """
-
-
-
-class AsymDiracSpectralInducingPoints(RectangularSpectralInducingPointsBase):
-    """
-    Real-space (in output space) ``spectral'' inter-domain inducing points with a PSD 
-    given by asymmetrical rectangles, which in this case are taken to be Dirac centred. 
-    Corresponding kernel is a multi cosine kernel,
-    where the powers of the individual cosine kernels stem from the summation of powers
-    of the asymetrical rectangular blocks corresponding to the cosine and sine transform,
-    respectively.
-    """
-
-    @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
-    @check_shapes(
-        "return: []",
-    )
-    def num_inducing(self) -> Optional[tf.Tensor]:
-        #NOTE -- this is the case when we only consider positive frequencies
-        #return self.kern.n_components * 2
         return self.kern.n_components * 2
+
+
