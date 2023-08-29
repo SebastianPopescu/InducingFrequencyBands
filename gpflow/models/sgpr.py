@@ -17,6 +17,7 @@ from typing import NamedTuple, Optional, Tuple
 import numpy as np
 import tensorflow as tf
 from check_shapes import check_shapes, inherit_check_shapes
+import math
 
 from .. import posteriors
 from ..base import InputData, MeanAndVariance, RegressionData, TensorData
@@ -456,6 +457,66 @@ class SGPR_deprecated(SGPRBase_deprecated):
         kuu = Kuu(self.inducing_variable, self.kernel, jitter=default_jitter())
 
         return kuf, kuu
+
+
+    def dirac_spectrum_covariance(self, xi1, xi2):
+
+        r"""
+        Computes the Dirac Delta scenario spectrum covariance for local spectrum 
+        \mathcal{F}_{c}(\xi), taking into account both negative and positive frequencies.
+        """
+
+        diff = tf.reshape(xi1,[-1,1]) -  tf.reshape(xi2, [1,-1])
+        Kzz = math.pi * tf.cast(tf.math.reciprocal(self.kernel.alpha), default_float()) # [1, ]
+        Kzz *= tf.math.exp(- math.pi**2 * tf.cast(tf.math.reciprocal(2. * self.kernel.alpha), default_float()) * 
+                        tf.square(diff)
+                        ) # [M, M]
+
+        spectrum_powers = self.kernel.powers * tf.cast(tf.math.reciprocal(2.), default_float()) 
+        spectrum_powers = tf.reshape(spectrum_powers, [-1,1,1]) # [Q, 1, 1]
+
+
+
+        rho = (tf.reshape(xi1,[-1,1]) + 
+            tf.reshape(xi2, [1,-1])) * 0.5 # [M, M]
+        rho = rho[tf.newaxis,...] # [1, M, M]
+
+
+        exp_pos_freq = tf.math.exp(-2*math.pi**2 * tf.cast(tf.math.reciprocal(self.kernel.alpha), default_float()) * 
+                        tf.square(rho - tf.reshape(self.kernel.means, [-1,1,1]))
+                        ) # [Q, M, M]
+
+
+        exp_neg_freq = tf.math.exp(-2*math.pi**2 * tf.cast(tf.math.reciprocal(self.kernel.alpha), default_float()) * 
+                        tf.square(rho + tf.reshape(self.kernel.means, [-1,1,1]))
+                        ) # [Q, M, M]
+
+        exp_part = spectrum_powers * (exp_pos_freq + exp_neg_freq) # [Q, M, M]
+
+        Kzz *= tf.reduce_sum(exp_part, axis = 0) # [M, M]
+
+        return Kzz
+
+
+    #FIXME -- make this work eventually
+    #@inherit_check_shapes
+    def get_complex_gp_covariances(
+        self, full_cov: bool = False, full_output_cov: bool = False
+    ):
+        """
+        Compute the mean and variance of the latent function at some new points
+        Xnew. For a derivation of the terms in here, see the associated SGPR
+        notebook.
+        """
+        
+        # Local Spectrum covariance         
+        #K = dirac_spectrum_covariance(concat_freqs, concat_freqs, kernel) # [2M, 2M]
+        K = self.dirac_spectrum_covariance(self.kernel.means, self.kernel.means) # [M, M]
+        # Local Spectrum pseudo-covariance
+        #P = dirac_spectrum_covariance(concat_freqs, -concat_freqs, kernel) # [2M, 2M]
+        P = self.dirac_spectrum_covariance(self.kernel.means, - self.kernel.means) # [M, M]
+        
+        return P, K
 
     @check_shapes(
         "return[0]: [M, P]",

@@ -61,8 +61,8 @@ def func(x):
 
 N = 500  # Number of training observations
 
-#EXPERIMENT = 'toy_sine'
-EXPERIMENT = 'hr1'
+EXPERIMENT = 'toy_sine'
+#EXPERIMENT = 'hr1'
 #EXPERIMENT = 'hr2'
 #EXPERIMENT = 'sunspots'
 
@@ -137,7 +137,7 @@ elif EXPERIMENT == 'sunspots':
 if MODEL == 'GPR':
     N_COMPONENTS = 10
 else:
-    N_COMPONENTS = 100
+    N_COMPONENTS = 50
 MAXITER = 100
 
 
@@ -148,7 +148,7 @@ INIT_METHOD = 'Periodogram'
 #INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-2
+ALPHA = 1e-3
 
 
 if KERNEL == 'cosine':
@@ -429,3 +429,35 @@ def plot_covariance(model):
     plt.close()
 
 plot_covariance(model)
+
+
+
+
+
+def plot_complex_gp_covariances(model):
+    """
+    #TODO -- write documentation
+    """
+    _pcov, _cov = model.get_complex_gp_covariances()
+
+    print(_pcov)
+    print(_cov)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3, 10))
+
+    # Pseudo-covariance local spectrum \mathcal{F}_{c}(xi,xi') -- Complex GP
+    ax1.matshow(_pcov.numpy(), aspect="auto")
+    ax1.set_yticklabels([])
+    ax1.set_xticklabels([])
+    ax1.set_title("Pseudo-covariance")
+
+    # Covariance local spectrum \mathcal{F}_{c}(xi,xi') -- Complex GP
+    ax2.matshow(_cov.numpy(), aspect="auto")
+    ax2.set_yticklabels([])
+    ax2.set_xticklabels([])
+    ax2.set_title("Covariance")
+
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_complex_gp_covariances.png')
+    plt.close()
+
+plot_complex_gp_covariances(model)

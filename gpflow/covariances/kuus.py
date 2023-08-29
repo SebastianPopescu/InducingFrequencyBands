@@ -79,7 +79,8 @@ def Kuu_block_spectral_kernel_inducingpoints(
 
 @Kuu.register(SymRectangularDiracDeltaSpectralInducingPoints, MultipleDiracDeltaSpectralBlock)
 def Kuu_rectangular_dirac_delta_spectral_kernel_inducingpoints(
-    inducing_variable: SpectralInducingVariables, kernel: SpectralKernel, *, jitter: float = 0.0
+    inducing_variable: SymRectangularDiracDeltaSpectralInducingPoints, 
+    kernel: MultipleDiracDeltaSpectralBlock, *, jitter: float = 0.0
 ) -> tf.Tensor:
     
     r"""
@@ -100,6 +101,7 @@ def Kuu_rectangular_dirac_delta_spectral_kernel_inducingpoints(
     To be used for Inducing Frequency Bands models with Dirac Delta bandwidths for its ind. pts.
     """
 
+    #NOTE -- this is only if we want to use the negative freqs. as features as well.
     #concat_freqs = tf.concat([-kernel.means,kernel.means], axis = 1)
 
     # Local Spectrum covariance         
@@ -107,7 +109,7 @@ def Kuu_rectangular_dirac_delta_spectral_kernel_inducingpoints(
     K = dirac_spectrum_covariance(kernel.means, kernel.means, kernel) # [M, M]
     # Local Spectrum pseudo-covariance
     #P = dirac_spectrum_covariance(concat_freqs, -concat_freqs, kernel) # [2M, 2M]
-    P = dirac_spectrum_covariance(kernel.means, -kernel.means, kernel) # [M, M]
+    P = dirac_spectrum_covariance(kernel.means, - kernel.means, kernel) # [M, M]
 
     # Krr -- real covariance
     real_cov = 0.5*(K + P) # [2M, 2M]
@@ -120,6 +122,7 @@ def Kuu_rectangular_dirac_delta_spectral_kernel_inducingpoints(
 
     return Kzz # [4M, 4M]
 
+
 def dirac_spectrum_covariance(xi1, xi2, kernel):
 
     r"""
@@ -129,8 +132,9 @@ def dirac_spectrum_covariance(xi1, xi2, kernel):
 
     print('--- inside dirac_spectrum_covariance ---')
 
-    diff = tf.reshape(xi1,[-1,1]) -  tf.reshape(xi2, [1,-1])
     Kzz = math.pi * tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) # [1, ]
+    
+    diff = tf.reshape(xi1, [-1,1]) -  tf.reshape(xi2, [1,-1])
     Kzz *= tf.math.exp(- math.pi**2 * tf.cast(tf.math.reciprocal(2. * kernel.alpha), default_float()) * 
                        tf.square(diff)
                        ) # [M, M]
@@ -142,22 +146,24 @@ def dirac_spectrum_covariance(xi1, xi2, kernel):
     print("spectrum_powers")
     print(spectrum_powers)
 
-
-    rho = (tf.reshape(xi1,[-1,1]) + 
-           tf.reshape(xi2, [1,-1])) * 0.5 # [M, M]
+    rho = (tf.reshape(xi1, [-1,1]) + 
+           tf.reshape(xi2, [1,-1])
+           ) * 0.5 # [M, M]
     rho = rho[tf.newaxis,...] # [1, M, M]
     print("rho")
     print(rho)
 
-    exp_pos_freq = tf.math.exp(-2*math.pi**2 * tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) * 
-                       tf.square(rho - tf.reshape(kernel.means, [-1,1,1]))
-                       ) # [Q, M, M]
+    exp_pos_freq = tf.math.exp(-2. * math.pi**2 * 
+                               tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) * 
+                               tf.square(rho - tf.reshape(kernel.means, [-1,1,1]))
+                               ) # [Q, M, M]
     print("exp_pos_freq")
     print(exp_pos_freq)
 
-    exp_neg_freq = tf.math.exp(-2*math.pi**2 * tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) * 
-                       tf.square(rho + tf.reshape(kernel.means, [-1,1,1]))
-                       ) # [Q, M, M]
+    exp_neg_freq = tf.math.exp(-2. * math.pi**2 * 
+                               tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) * 
+                               tf.square(rho + tf.reshape(kernel.means, [-1,1,1]))
+                               ) # [Q, M, M]
     print(exp_neg_freq)
     exp_part = spectrum_powers * (exp_pos_freq + exp_neg_freq) # [Q, M, M]
     print("exp_part")
@@ -172,6 +178,7 @@ def dirac_spectrum_covariance(xi1, xi2, kernel):
 ### Helper functions ###
 
 def outersum(a, b):
+    #NOTE -- this doesn't work with ``Parameters''
     _ = tf.experimental.numpy.outer(a, tf.ones_like(b))
     __ = tf.experimental.numpy.outer(tf.ones_like(a), b)
 
