@@ -175,6 +175,73 @@ def dirac_spectrum_covariance(xi1, xi2, kernel):
     return Kzz
 
 
+@Kuu.register(SymRectangularSpectralInducingPoints, MultipleSpectralBlock)
+def Kuu_rectangular_spectral_kernel_inducingpoints(
+    inducing_variable: SymRectangularDiracDeltaSpectralInducingPoints, 
+    kernel: MultipleDiracDeltaSpectralBlock, *, jitter: float = 0.0
+) -> tf.Tensor:
+    
+    r"""
+    Local Spectrum \mathcal{F}_{c}\left(  \xi \right) 
+    is a complex GP, meaning it posses both a covariance
+    and a pseudo-covariance, from which we can obtain
+    the covariances for its real and imaginary components.
+
+    #TODO -- find eqns on Overleaf.
+    K and P correspond to equations ...
+
+    Real and Imaginary covariances correspond to equations ... 
+
+    _means = kernel.means # expected shape [D, M]
+    _bandwidths = kernel.bandwidths # expected shape [D, M]
+    _powers = kernel.powers # expected shape [M, ]
+
+    To be used for Inducing Frequency Bands models with finite rectangular bandwidths
+    for its inter-domain inducing points.
+    """
+
+    #NOTE -- this is only if we want to use the negative freqs. as features as well.
+    #concat_freqs = tf.concat([-kernel.means,kernel.means], axis = 1)
+
+    # Local Spectrum covariance         
+    #K = dirac_spectrum_covariance(concat_freqs, concat_freqs, kernel) # [2M, 2M]
+    K = spectrum_covariance(kernel.means, kernel.means, kernel) # [M, M]
+    # Local Spectrum pseudo-covariance
+    #P = dirac_spectrum_covariance(concat_freqs, -concat_freqs, kernel) # [2M, 2M]
+    #P = spectrum_covariance(kernel.means, - kernel.means, kernel) # [M, M]
+
+    #Pseudo-covariance is just a zero matrix in this case.
+    P = tf.zeros_like(K, dtype = default_float())
+
+    # Krr -- real covariance
+    real_cov = 0.5*(K + P) # [2M, 2M]
+    # Kii -- imaginary covariance
+    imag_cov = 0.5*(K - P) # [2M, 2M]
+    #NOTE -- remainder: Kir = Kri = 0 since the underlying signal is real-valued.
+
+    Kzz = BlockDiagMat(real_cov, imag_cov) # [4M, 4M]
+    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype) # [4M, 4M]
+
+    return Kzz # [4M, 4M]
+
+
+def spectrum_covariance(xi1, xi2, kernel):
+
+    r"""
+    Computes the finite rectangular bandwidths case spectrum covariance for local spectrum 
+    \mathcal{F}_{c}(\xi), taking into account both negative and positive frequencies.
+    """
+    
+    print('--- inside spectrum_covariance ---')
+
+    spectrum_powers = kernel.powers * tf.cast(tf.math.reciprocal(2.), default_float()) 
+    Kzz = tf.linalg.diag(spectrum_powers)
+    print('Kzz')
+    print(Kzz)
+
+    return Kzz
+
+
 ### Helper functions ###
 
 def outersum(a, b):

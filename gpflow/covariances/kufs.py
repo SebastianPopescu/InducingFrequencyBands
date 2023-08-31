@@ -146,6 +146,92 @@ def dirac_spectrum_time_cross_covariance(xi1, Xnew, kernel, means):
     return Kzf_real, Kzf_imag
 
 
+
+@Kuf.register(SymRectangularSpectralInducingPoints, MultipleSpectralBlock, TensorLike)
+#@check_shapes(
+#    "inducing_variable: [M, D, 1]",
+#    "Xnew: [batch..., N, D]",
+#    "return: [M, batch..., N]",
+#)
+def Kuf_rectangular_spectral_kernel_inducingpoints(
+    inducing_variable: SymRectangularSpectralInducingPoints, 
+    kernel: MultipleSpectralBlock, 
+    Xnew: TensorType
+) -> tf.Tensor:
+
+    #Xnew -- [N,D]
+    #kernel.means -- [D,M]
+
+    """
+    neg_freq_real_pos_freq, neg_freq_imag_pos_freq = dirac_spectrum_time_cross_covariance(
+        -kernel.means, Xnew, kernel, kernel.means)
+    neg_freq_real_neg_freq, neg_freq_imag_neg_freq = dirac_spectrum_time_cross_covariance(
+        -kernel.means, Xnew, kernel, -kernel.means)
+    """
+        
+    pos_freq_real_pos_freq, pos_freq_imag_pos_freq = spectrum_time_cross_covariance(
+        kernel.means, Xnew, kernel, kernel.means)
+    #pos_freq_real_neg_freq, pos_freq_imag_neg_freq = spectrum_time_cross_covariance(
+    #    kernel.means, Xnew, kernel, -kernel.means)
+
+    #neg_freq_real = neg_freq_real_pos_freq + neg_freq_real_neg_freq
+    pos_freq_real = pos_freq_real_pos_freq #+ pos_freq_real_neg_freq
+
+    #neg_freq_imag = neg_freq_imag_pos_freq + neg_freq_imag_neg_freq
+    pos_freq_imag = pos_freq_imag_pos_freq #+ pos_freq_imag_neg_freq
+
+    """
+    Kzf = tf.concat([neg_freq_real, pos_freq_real, 
+                     neg_freq_imag, pos_freq_imag], 
+                     axis = 0)
+    """
+    Kzf = tf.concat([pos_freq_real, 
+                     pos_freq_imag], 
+                     axis = 0)
+
+
+    return Kzf
+
+def spectrum_time_cross_covariance(xi1, Xnew, kernel, means):
+
+    _bandwidths = kernel.bandwidths # expected shape [D, M]
+    _powers = kernel.powers # expected shape [M, ]
+
+    spectrum_powers = _powers * tf.cast(tf.math.reciprocal(2. * _bandwidths), default_float()) 
+    spectrum_powers = tf.reshape(spectrum_powers, [-1, 1]) #[M, 1]
+
+    # real part 
+    real_sine_term = tf.reduce_prod( tf.sin(math.pi * 
+                                            tf.multiply(tf.transpose(_bandwidths)[..., None], # [M, D, 1]
+                                                        tf.transpose(Xnew)[None, ...] # [1, D, N]
+                                                        ) #[M, D, N]
+                                            ), axis = 1) #[M, N]
+    
+    real_cosine_term = tf.reduce_prod( tf.cos(2. * math.pi * 
+                                              tf.multiply(tf.transpose(xi1)[..., None], # [M, D, 1]
+                                                          tf.transpose(Xnew)[None, ...] # [1, D, N]
+                                                          ) #[M, D, N]
+                                            ), axis = 1) #[M, N]
+
+    real_part  = spectrum_powers * real_sine_term * real_cosine_term #[M, N]
+
+    # imaginary part 
+    imag_sine_term = 2. * tf.reduce_prod( tf.sin(2. * math.pi * 
+                                              tf.multiply(tf.transpose(xi1)[..., None], # [M, D, 1]
+                                                          tf.transpose(Xnew)[None, ...] # [1, D, N]
+                                                          ) #[M, D, N]
+                                            ), axis = 1) #[M, N]
+
+    img_part  = spectrum_powers * real_sine_term * imag_sine_term # expected shape (M, N)
+
+    #NOTE -- this is the case when we are taking just the positive frequencies.
+    #Kzf = tf.concat([pos_real_part, pos_img_part], axis = 0)
+
+
+    return real_part, img_part
+
+
+
 @Kuf.register(Multiscale, SquaredExponential, TensorLike)
 @check_shapes(
     "inducing_variable: [M, D, 1]",
