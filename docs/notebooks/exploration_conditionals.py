@@ -61,8 +61,8 @@ def func(x):
 
 N = 500  # Number of training observations
 
-EXPERIMENT = 'toy_sine'
-#EXPERIMENT = 'hr1'
+#EXPERIMENT = 'toy_sine'
+EXPERIMENT = 'hr1'
 #EXPERIMENT = 'hr2'
 #EXPERIMENT = 'sunspots'
 
@@ -112,8 +112,8 @@ MODEL = 'SGPR'
 # # ,
 # 3. 'multidirac': 
 
-KERNEL = 'multidirac'
-#KERNEL = 'multisinc' 
+#KERNEL = 'multidirac'
+KERNEL = 'multisinc' 
 #KERNEL = 'cosine'
 
 
@@ -255,13 +255,16 @@ elif MODEL=='SGPR':
             n_components=N_COMPONENTS, 
             x_interval = [X_cond.max() -  X_cond.min()]
             )
-    
-    ind_var = gpflow.inducing_variables.SymRectangularDiracDeltaSpectralInducingPoints(kern = kern
-                                                                                )
+
+    if KERNEL=='multidirac':
+        ind_var = gpflow.inducing_variables.SymRectangularDiracDeltaSpectralInducingPoints(kern = kern)
+    elif KERNEL == 'multisinc':
+        ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kern)
+
     model = gpflow.models.SGPR(data = (X_cond, Y_cond), 
-                                kernel=kern, 
-                                inducing_variable = ind_var, 
-                                noise_variance=1e-3)
+                            kernel=kern, 
+                            inducing_variable = ind_var, 
+                            noise_variance=1e-3)
 
 #optimise = True
 optimise = False
