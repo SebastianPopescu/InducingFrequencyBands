@@ -61,8 +61,8 @@ def func(x):
 
 N = 500  # Number of training observations
 
-EXPERIMENT = 'toy_sine'
-#EXPERIMENT = 'hr1'
+#EXPERIMENT = 'toy_sine'
+EXPERIMENT = 'hr1'
 #EXPERIMENT = 'hr2'
 #EXPERIMENT = 'sunspots'
 
@@ -130,7 +130,7 @@ if MODEL == 'GPR':
 else:
     N_COMPONENTS = 50
 MAXITER = 25
-UPSCALEALPHA = 50.0
+UPSCALEALPHA = 1.
 
 # %% [markdown]
 # # Can choose between 'rbf', 'Periodogram' or 'Neutral'
@@ -139,7 +139,7 @@ INIT_METHOD = 'Periodogram'
 #INIT_METHOD ='Neutral'
 DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-12
+ALPHA = 1e-3
 
 # NOTE -- in this case this initializes the underlying SMK for Kff time-domain 
 #NEUTRAL = True # Initializes SMK in a non-informative manner
@@ -257,8 +257,8 @@ elif MODEL=='SGPR':
                                 inducing_variable = ind_var, 
                                 noise_variance=1e-3)
 
-#optimise = True
-optimise = False
+optimise = True
+#optimise = False
 
 if optimise:
     #NOTE -- be careful with these deactivations
