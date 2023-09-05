@@ -73,72 +73,52 @@ def Kuf_rectangular_dirac_delta_spectral_kernel_inducingpoints(
     inducing_variable: SymRectangularDiracDeltaSpectralInducingPoints, kernel: MultipleDiracDeltaSpectralBlock, Xnew: TensorType
 ) -> tf.Tensor:
 
+    #NOTE -- this will only work with 1D data
     #Xnew -- [N,D]
     #kernel.means -- [D,M]
-
-    """
-    neg_freq_real_pos_freq, neg_freq_imag_pos_freq = dirac_spectrum_time_cross_covariance(
-        -kernel.means, Xnew, kernel, kernel.means)
-    neg_freq_real_neg_freq, neg_freq_imag_neg_freq = dirac_spectrum_time_cross_covariance(
-        -kernel.means, Xnew, kernel, -kernel.means)
-    """
         
     pos_freq_real_pos_freq, pos_freq_imag_pos_freq = dirac_spectrum_time_cross_covariance(
         kernel.means, Xnew, kernel, kernel.means)
     pos_freq_real_neg_freq, pos_freq_imag_neg_freq = dirac_spectrum_time_cross_covariance(
         kernel.means, Xnew, kernel, -kernel.means)
 
-    #neg_freq_real = neg_freq_real_pos_freq + neg_freq_real_neg_freq
     pos_freq_real = pos_freq_real_pos_freq + pos_freq_real_neg_freq
-
-    #neg_freq_imag = neg_freq_imag_pos_freq + neg_freq_imag_neg_freq
     pos_freq_imag = pos_freq_imag_pos_freq + pos_freq_imag_neg_freq
 
-    """
-    Kzf = tf.concat([neg_freq_real, pos_freq_real, 
-                     neg_freq_imag, pos_freq_imag], 
-                     axis = 0)
-    """
     Kzf = tf.concat([pos_freq_real, 
                      pos_freq_imag], 
                      axis = 0)
-
 
     return Kzf
 
 
 def dirac_spectrum_time_cross_covariance(xi1, Xnew, kernel, means):
-
-    print('--- inside dirac_spectrum_time_cross_covariance ---')
+    #NOTE -- this will only work with 1D data
 
     pre_multiplier = tf.sqrt(math.pi * tf.cast(tf.math.reciprocal(kernel.alpha), default_float()))
 
     spectrum_powers = kernel.powers * tf.cast(tf.math.reciprocal(2.), default_float()) 
     spectrum_powers = tf.reshape(spectrum_powers, [-1,1,1]) # [Q, 1, 1]
-    print('spectrum_powers')
-    print(spectrum_powers)
 
     exp_freq = tf.math.exp(-math.pi**2 * tf.cast(tf.math.reciprocal(kernel.alpha), default_float())  * 
                            tf.square(tf.reshape(xi1, [1,-1,1]) # [1, M, 1]
                                   - tf.reshape(means, [-1,1,1])) # [Q, 1, 1]
                        ) # [Q, M, 1]
-    print('exp_freq')
-    print(exp_freq)
 
     exp_part = spectrum_powers * exp_freq  # [Q, M, 1]
 
+    out = 2.* math.pi * tf.transpose(xi1) * tf.transpose(Xnew) # [M, N]
+
     # real part
-    #NOTE -- this will only work with 1D data
-    Kzf_real = tf.math.cos(2.* math.pi * tf.transpose(xi1) * tf.transpose(Xnew)) # [M, N]
+
+    Kzf_real = tf.math.cos(out) # [M, N]
     Kzf_real = Kzf_real[tf.newaxis, ...] # [1, M, N]
-    print('Kzf_real')
-    print(Kzf_real)
     Kzf_real *= pre_multiplier * exp_part # [Q, M, N]
     Kzf_real = tf.reduce_sum(Kzf_real, axis = 0) # [M, N]
-    print('Kzf_real')
-    print(Kzf_real)
+
     # imaginary part
-    Kzf_imag = tf.math.sin(2.* math.pi * tf.transpose(xi1) * tf.transpose(Xnew)) # [M, N]
+
+    Kzf_imag = tf.math.sin(out) # [M, N]
     Kzf_imag = Kzf_imag[tf.newaxis,...] # [1, M, N]
     Kzf_imag *= pre_multiplier * exp_part # [Q, M, N]
     Kzf_imag = tf.reduce_sum(Kzf_imag, axis = 0) # [M, N]

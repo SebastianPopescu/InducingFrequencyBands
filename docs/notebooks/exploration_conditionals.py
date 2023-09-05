@@ -61,8 +61,8 @@ def func(x):
 
 N = 500  # Number of training observations
 
-#EXPERIMENT = 'toy_sine'
-EXPERIMENT = 'hr1'
+EXPERIMENT = 'toy_sine'
+#EXPERIMENT = 'hr1'
 #EXPERIMENT = 'hr2'
 #EXPERIMENT = 'sunspots'
 
@@ -112,8 +112,8 @@ MODEL = 'SGPR'
 # # ,
 # 3. 'multidirac': 
 
-#KERNEL = 'multidirac'
-KERNEL = 'multisinc' 
+KERNEL = 'multidirac'
+#KERNEL = 'multisinc' 
 #KERNEL = 'cosine'
 
 
@@ -137,7 +137,7 @@ elif EXPERIMENT == 'sunspots':
 if MODEL == 'GPR':
     N_COMPONENTS = 10
 else:
-    N_COMPONENTS = 50
+    N_COMPONENTS = 500
 MAXITER = 100
 
 

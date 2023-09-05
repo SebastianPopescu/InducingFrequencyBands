@@ -223,7 +223,7 @@ class MultipleDiracDeltaSpectralBlock(AnisotropicSpectralStationary):
 
         returns: expected_shape [N1,N2]
         """
-
+        #NOTE -- this currently works just for 1D data
         #TODO -- shouldn't this be a reduce_prod last dim outside tf.cos???
         cos_term = tf.cos(2 * math.pi * tf.reduce_sum(d, axis = -1)) #[M, N1, N2]
     

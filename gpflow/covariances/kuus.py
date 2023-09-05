@@ -101,14 +101,11 @@ def Kuu_rectangular_dirac_delta_spectral_kernel_inducingpoints(
     To be used for Inducing Frequency Bands models with Dirac Delta bandwidths for its ind. pts.
     """
 
-    #NOTE -- this is only if we want to use the negative freqs. as features as well.
-    #concat_freqs = tf.concat([-kernel.means,kernel.means], axis = 1)
+    #NOTE -- this will only work for 1D data
 
     # Local Spectrum covariance         
-    #K = dirac_spectrum_covariance(concat_freqs, concat_freqs, kernel) # [2M, 2M]
     K = dirac_spectrum_covariance(kernel.means, kernel.means, kernel) # [M, M]
     # Local Spectrum pseudo-covariance
-    #P = dirac_spectrum_covariance(concat_freqs, -concat_freqs, kernel) # [2M, 2M]
     P = dirac_spectrum_covariance(kernel.means, - kernel.means, kernel) # [M, M]
 
     # Krr -- real covariance
@@ -117,10 +114,10 @@ def Kuu_rectangular_dirac_delta_spectral_kernel_inducingpoints(
     imag_cov = 0.5*(K - P) # [2M, 2M]
     #NOTE -- remainder: Kir = Kri = 0 since the underlying signal is real-valued.
 
-    Kzz = BlockDiagMat(real_cov, imag_cov) # [4M, 4M]
-    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype) # [4M, 4M]
+    Kzz = BlockDiagMat(real_cov, imag_cov) # [2M, 2M]
+    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype) # [2M, 2M]
 
-    return Kzz # [4M, 4M]
+    return Kzz # [2M, 2M]
 
 
 def dirac_spectrum_covariance(xi1, xi2, kernel):
@@ -129,8 +126,7 @@ def dirac_spectrum_covariance(xi1, xi2, kernel):
     Computes the Dirac Delta scenario spectrum covariance for local spectrum 
     \mathcal{F}_{c}(\xi), taking into account both negative and positive frequencies.
     """
-
-    print('--- inside dirac_spectrum_covariance ---')
+    #NOTE -- this will only work for 1D data
 
     Kzz = math.pi * tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) # [1, ]
     
@@ -138,39 +134,29 @@ def dirac_spectrum_covariance(xi1, xi2, kernel):
     Kzz *= tf.math.exp(- math.pi**2 * tf.cast(tf.math.reciprocal(2. * kernel.alpha), default_float()) * 
                        tf.square(diff)
                        ) # [M, M]
-    print('Kzz')
-    print(Kzz)
 
+    #TODO -- might need to add the very low kernel.epsilon here
     spectrum_powers = kernel.powers * tf.cast(tf.math.reciprocal(2.), default_float()) 
     spectrum_powers = tf.reshape(spectrum_powers, [-1,1,1]) # [Q, 1, 1]
-    print("spectrum_powers")
-    print(spectrum_powers)
 
     rho = (tf.reshape(xi1, [-1,1]) + 
            tf.reshape(xi2, [1,-1])
            ) * 0.5 # [M, M]
     rho = rho[tf.newaxis,...] # [1, M, M]
-    print("rho")
-    print(rho)
 
     exp_pos_freq = tf.math.exp(-2. * math.pi**2 * 
                                tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) * 
                                tf.square(rho - tf.reshape(kernel.means, [-1,1,1]))
                                ) # [Q, M, M]
-    print("exp_pos_freq")
-    print(exp_pos_freq)
 
     exp_neg_freq = tf.math.exp(-2. * math.pi**2 * 
                                tf.cast(tf.math.reciprocal(kernel.alpha), default_float()) * 
                                tf.square(rho + tf.reshape(kernel.means, [-1,1,1]))
                                ) # [Q, M, M]
-    print(exp_neg_freq)
+
     exp_part = spectrum_powers * (exp_pos_freq + exp_neg_freq) # [Q, M, M]
-    print("exp_part")
-    print(exp_part)
+
     Kzz *= tf.reduce_sum(exp_part, axis = 0) # [M, M]
-    print("Kzz")
-    print(Kzz)
 
     return Kzz
 
