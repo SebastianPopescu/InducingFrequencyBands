@@ -15,10 +15,18 @@
 import numpy as np  # pylint: disable=unused-import  # Used by Sphinx to generate documentation.
 import tensorflow as tf
 from check_shapes import check_shapes
+import math
 
 from ..config import default_float
 from ..base import TensorLike, TensorType
-from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SymRectangularSpectralInducingPoints 
+from ..inducing_variables import (
+    InducingPatches, 
+    InducingPoints, 
+    Multiscale, 
+    SymRectangularSpectralInducingPoints,
+    IFFRectangularSpectralInducingPoints,
+)
+     
 from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, MixtureSpectralGaussianVectorized
 from .dispatch import Kuf
 
@@ -33,6 +41,26 @@ def Kuf_kernel_inducingpoints(
     inducing_variable: InducingPoints, kernel: Kernel, Xnew: TensorType
 ) -> tf.Tensor:
     return kernel(inducing_variable.Z, Xnew)
+
+
+@Kuf.register(IFFRectangularSpectralInducingPoints, SquaredExponential, TensorLike)
+#@check_shapes(
+#    "inducing_variable: [M, D, 1]",
+#    "Xnew: [batch..., N, D]",
+#    "return: [M, batch..., N]",
+#)
+def Kuf_IFF_inducingpoints(
+    inducing_variable: IFFRectangularSpectralInducingPoints, 
+    kernel: SquaredExponential, Xnew: TensorType
+) -> tf.Tensor:
+    
+    prod = 2. * math.pi * tf.reshape(Xnew, [1,-1]) * tf.reshape(inducing_variable.Z, [-1,1])
+
+    out_cosine = tf.cast(tf.sqrt(2.), default_float()) * tf.math.cos(prod)
+    out_sine = tf.cast(tf.sqrt(2.), default_float()) * tf.math.sin(prod)
+
+    return tf.concat([out_cosine, out_sine], axis = 0)
+
 
 
 @Kuf.register(InducingPoints, MultipleSpectralBlock, TensorLike)

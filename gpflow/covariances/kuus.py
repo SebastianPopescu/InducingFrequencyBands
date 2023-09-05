@@ -15,10 +15,24 @@
 import tensorflow as tf
 import numpy as np
 from check_shapes import check_shapes
-
+import math
 from ..config import default_float
-from ..inducing_variables import InducingPatches, InducingPoints, Multiscale, SpectralInducingVariables, SymRectangularSpectralInducingPoints 
-from ..kernels import Convolutional, Kernel, SquaredExponential, MultipleSpectralBlock, SpectralKernel, MixtureSpectralGaussianVectorized
+from ..inducing_variables import (
+    InducingPatches, 
+    InducingPoints, 
+    Multiscale, 
+    SpectralInducingVariables, 
+    SymRectangularSpectralInducingPoints,
+    IFFRectangularSpectralInducingPoints,
+) 
+from ..kernels import (
+    Convolutional, 
+    Kernel, 
+    SquaredExponential, 
+    MultipleSpectralBlock, 
+    SpectralKernel, 
+    MixtureSpectralGaussianVectorized
+)
 from .dispatch import Kuu
 
 
@@ -59,6 +73,62 @@ def Kuu_block_spectral_kernel_inducingpoints(
     
     Kzz = kernel(inducing_variable.Z)
     Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
+    return Kzz
+
+#my own version
+def rbf_spectral_density(freq, lengthscale, variance):
+
+    _pi = math.pi
+
+    constant_num = tf.sqrt(tf.sqrt(lengthscale)) / tf.cast((2. * tf.sqrt(_pi)), default_float())
+    freq_term = tf.exp(- tf.sqrt(lengthscale) * freq**2 * 0.25)
+    S = constant_num * freq_term
+
+    return S * variance
+
+@Kuu.register(IFFRectangularSpectralInducingPoints, SquaredExponential)
+def Kuu_IFF_inducingpoints(
+    inducing_variable: IFFRectangularSpectralInducingPoints, 
+    kernel: SquaredExponential, *, jitter: float = 0.0
+) -> tf.Tensor:
+    
+    r"""
+    To be used for IFF. In the paper, they only use SqExp kernels.
+    
+    When rescaled as Kuf, so that Kuf is independent of the hyperparameters, 
+    Kuu is just a diagonal matrix of 
+    spectral density evaluations scaled by 1/(ε_1...ε_D)
+    """
+    
+    #Talay's codebase
+    #vol = lab.prod(inducing_variable.epsilon)
+    #return tf.linalg.LinearOperatorInversion(tf.linalg.LinearOperatorDiag(
+    #            (spectral_density(kernel, inducing_variable.z)*vol),
+    #            is_non_singular=True,
+    #            is_self_adjoint=True,
+    #            is_positive_definite=True,
+    #            is_square=True
+    #        ))
+
+    _means = inducing_variable.Z # expected shape [D, M]
+    _lengthscales = kernel.lengthscales # [D,]
+    _variance = kernel.variance # [D,]
+ 
+    #TODO -- this squeeze is a hack, fix underlying issue
+    spectral_component = tf.squeeze(
+        rbf_spectral_density(freq = _means, lengthscale = _lengthscales, 
+                             variance = _variance), 
+                             axis = 0) #  [M, ]
+
+    #spectral_component = spectral_density_gaussian(kernel, inducing_variable.Z)
+
+    Kzz = tf.linalg.diag(tf.math.reciprocal(
+        tf.concat([spectral_component, spectral_component], axis=0)
+        ))
+
+    Kzz*= tf.cast(tf.math.reciprocal(inducing_variable.epsilon), default_float())
+    Kzz += jitter * tf.eye(inducing_variable.num_inducing, dtype=Kzz.dtype)
+
     return Kzz
 
 

@@ -41,7 +41,12 @@ plt.style.use("ggplot")
 
 import gpflow
 from gpflow.ci_utils import reduce_in_tests
-from gpflow.init import riemann_approximate_periodogram_initial_components, rbf_spectral_density, neutral_initial_components, riemann_approximate_rbf_initial_components
+from gpflow.init import (
+    riemann_approximate_periodogram_initial_components, 
+    rbf_spectral_density, 
+    neutral_initial_components, 
+    riemann_approximate_rbf_initial_components
+)
 from gpflow.kernels.initialisation_spectral_np import np_disjoint_initial_components
 import statsmodels.api as sm
 # for reproducibility of this notebook:
@@ -61,8 +66,8 @@ def func(x):
 
 N = 500  # Number of training observations
 
-#EXPERIMENT = 'toy_sine'
-EXPERIMENT = 'hr1'
+EXPERIMENT = 'toy_sine'
+#EXPERIMENT = 'hr1'
 #EXPERIMENT = 'hr2'
 #EXPERIMENT = 'sunspots'
 
@@ -95,18 +100,15 @@ X_cond = X_cond - X_offset
 Y_offset = np.mean(Y_cond)
 Y_cond = Y_cond - Y_offset
 
-# %% [markdown]
-# # Can choose between 'GPR' and 'SGPR'
-
 MODEL = 'SGPR'
-#MODEL = 'GPR'
-
 # %% [markdown]
-# # 'MixtureGaussianSpectral' (i.e., corresponds to symmetrical 
+# # 'SqExp' (i.e., corresponds to  
 # # Dirac Delta rectangular blocks for
-# # Inducing Frequency Bands based on the underlying SMK) 
+# # Integrated Fourier Features based on the underlying
+# # squared exponential kernel) 
 
-KERNEL = 'MixtureGaussianSpectral'
+KERNEL = 'SqExp'
+EPSILON = 1e-1
 
 if EXPERIMENT=='toy_sine':
     MAXFREQ = 10.
@@ -124,152 +126,31 @@ elif EXPERIMENT == 'sunspots':
     MAXFREQ = 0.2
     X_plotting_offset = 500
 
-
-if MODEL == 'GPR':
-    N_COMPONENTS = 10
-else:
-    N_COMPONENTS = 50
-MAXITER = 25
-UPSCALEALPHA = 1.
-
-# %% [markdown]
-# # Can choose between 'rbf', 'Periodogram' or 'Neutral'
-#INIT_METHOD = 'rbf'
-INIT_METHOD = 'Periodogram' 
-#INIT_METHOD ='Neutral'
-DELTAS = 1e-1
-#NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-3
-
-# NOTE -- in this case this initializes the underlying SMK for Kff time-domain 
-#NEUTRAL = True # Initializes SMK in a non-informative manner
-NEUTRAL = False # Initializes SMK to be close to the Periodogram of the training data
-if NEUTRAL:
-    means_np, bandwidths_np, powers_np = np_disjoint_initial_components([MAXFREQ], 
-                                                                    n_components=N_COMPONENTS, 
-                                                                    x_interval = [X_cond.max() -  X_cond.min()])
-else:
-    means_np, bandwidths_np, powers_np = riemann_approximate_periodogram_initial_components(
-        X_cond.reshape((-1,1)), 
-        Y_cond.ravel(), 
-        [MAXFREQ], 
-        n_components=N_COMPONENTS, 
-        x_interval = [X_cond.max() -  X_cond.min()]
-        )
+N_COMPONENTS = 100
+MAXITER = 100
 
 X_cond = X_cond.reshape((-1, 1))
 Y_cond = Y_cond.reshape((-1, 1))
 
 data_object = gpflow.data.Data(X = X_cond, Y = Y_cond)
 
-means_np = means_np.astype(np.float)
-bandwidths_np = bandwidths_np.astype(np.float64)
 
-print('means_np')
-print(means_np)
-print(means_np.shape)
+kern = gpflow.kernels.SquaredExponential(variance=1.0, lengthscales=0.301)
 
-print('bandwidths_np')
-print(bandwidths_np)
-print(bandwidths_np.shape)
+ind_var = gpflow.inducing_variables.IFFRectangularSpectralInducingPoints(M = N_COMPONENTS, eps = EPSILON)
 
-print('lower limits')
-print(means_np - bandwidths_np * 0.5)
+model = gpflow.models.SGPR(data = (X_cond, Y_cond), 
+                           kernel=kern, 
+                           inducing_variable = ind_var, 
+                           noise_variance=1e-3)
 
-print('upper limits')
-print(means_np + bandwidths_np * 0.5)
-
-powers_np = [np.float64(np_float) for np_float in powers_np]
-
-print('powers_np')
-print(powers_np)
-
-#NOTE -- this is the initialisation from Tobar for SMK with Q=1
-def initialise_kernel(x, y):
-
-    #NOTE -- is Tobar taking just one Gaussian for the Mixture Spectral Kernel?
-
-    Nx = len(x) # number of observations
-    alpha = 0.5 / ((np.max(x) - 
-                            np.min(x))
-                            /2.)**2 # to be used for windowing function 
-    sigma = [np.std(y)] 
-    
-    gamma = 0.5 / ((np.max(x) - 
-                            np.min(x))
-                            /Nx)**2
-    gamma = np.reshape(gamma, (1,-1))
-
-    theta = 0.01
-    theta = np.reshape(theta, (1,-1))
-
-    sigma_n = np.std(y) / 10.
-    
-    return gpflow.kernels.MixtureSpectralGaussianVectorized(
-                                            means = theta,
-                                            bandwidths = gamma,
-                                            powers = sigma,
-                                            alpha = alpha)
-#Tobar init for kernel
-#kern = initialise_kernel(X_cond, Y_cond)
-if MODEL=='GPR':
-    alpha = 0.
-    kern = gpflow.kernels.MixtureSpectralGaussian(n_components=N_COMPONENTS,
-                                                means = means_np,
-                                                bandwidths = bandwidths_np,
-                                                powers = powers_np,
-                                                alpha = alpha)
-                                                
-else:
-    # to be used for windowing function
-    alpha = 0.5 / ((np.max(X_cond) - 
-                                np.min(X_cond))
-                                /2.)**2  
-    alpha = UPSCALEALPHA * alpha
-
-    kern = gpflow.kernels.MixtureSpectralGaussianVectorized(
-                                                means = means_np,
-                                                bandwidths = bandwidths_np,
-                                                powers = powers_np,
-                                                alpha = alpha)
-
-if MODEL=='GPR':
-    model = gpflow.models.GPR(
-        (X_cond, Y_cond), kernel=kern, noise_variance=1e-3
-    )
-elif MODEL=='SGPR':
-    
-    # NOTE -- this is just to get a good initialisation for the locations of Z
-    # I think the periodogram should focus on the right locations            
-    means_np, sth1, sth2 = riemann_approximate_periodogram_initial_components(
-            X_cond.reshape((-1,1)), 
-            Y_cond.ravel(), 
-            [MAXFREQ], 
-            n_components=N_COMPONENTS, 
-            x_interval = [X_cond.max() -  X_cond.min()]
-            )
-    
-    ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kern,
-                                                                                Z = means_np.reshape((-1,))
-                                                                                )
-    model = gpflow.models.SGPR(data = (X_cond, Y_cond), 
-                                kernel=kern, 
-                                inducing_variable = ind_var, 
-                                noise_variance=1e-3)
-
-optimise = True
-#optimise = False
+#optimise = True
+optimise = False
 
 if optimise:
     #NOTE -- be careful with these deactivations
     #gpflow.set_trainable(model.likelihood, False)
-    #if MODEL=='SGPR':
-    #    gpflow.set_trainable(model.inducing_variable.Z, False)
-    #opt = gpflow.optimizers.Scipy()
-    #opt_logs = opt.minimize(
-    #    model.training_loss, model.trainable_variables, 
-    #    options=dict(maxiter=MAXITER)
-    #)
+    gpflow.set_trainable(model.inducing_variable.Z, False)
 
     opt_logs = gpflow.optimizers.Scipy().minimize(
         model.training_loss,
@@ -300,21 +181,15 @@ def plot_kernel_prediction(
 
     Xplot = np.linspace(np.min(X_cond) - X_plotting_offset, np.max(X_cond) + X_plotting_offset, 100)[:, None]
 
-    if MODEL=='GPR':
-        f_mean, f_var = model.predict_y(Xplot, full_cov=False)
-        f_lower = f_mean - 1.96 * np.sqrt(f_var)
-        f_upper = f_mean + 1.96 * np.sqrt(f_var)
-    elif MODEL=='SGPR':
-        #NOTE -- just the non-parametric part for the moment
-        #f_mean, f_var = model.predict_f_non_parametric(Xplot, full_cov=False)
-        if parametric:
-            f_mean, f_var = model.predict_f_parametric(Xplot, full_cov=False)
-        else:
-            f_mean, f_var = model.predict_f_non_parametric(Xplot, full_cov=False)
-        f_lower = f_mean - 1.96 * np.sqrt(f_var)
-        f_upper = f_mean + 1.96 * np.sqrt(f_var)
+
+    #NOTE -- just the non-parametric part for the moment
+    #f_mean, f_var = model.predict_f_non_parametric(Xplot, full_cov=False)
+    if parametric:
+        f_mean, f_var = model.predict_f_parametric(Xplot, full_cov=False)
     else:
-        pass
+        f_mean, f_var = model.predict_f_non_parametric(Xplot, full_cov=False)
+    f_lower = f_mean - 1.96 * np.sqrt(f_var)
+    f_upper = f_mean + 1.96 * np.sqrt(f_var)
 
     ax.plot(X_cond, Y_cond,'.r', markersize=10, label='observations')
     #ax.scatter(X_cond, Y_cond, color="black")
@@ -354,70 +229,42 @@ def plot_spectrum_blocks(
 
     data_object.plot_spectrum(ax = ax, maxfreq=MAXFREQ)
 
+
+    #TODO -- I can reintroduce this a bit later.
+    """
     for _ in range(N_COMPONENTS):
-        #spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
-        #                                            means_np[:,_], bandwidths_np[:,_], 
-        #                                            powers_np[_], use_blocks = True)
-        #ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a.ravel(), 
-        #        label='$S_{aa}(\\nu)$', linewidth=.8)
+        
+        _kernel_powers = model.kernel.powers[_]
 
-        if KERNEL == 'decomposed_multisinc':
-            _kernel_powers = model.kernel.real_powers[_] + kern.img_powers[_]
-        elif KERNEL == 'MixtureGaussianSpectral':
-            pass
-        else:
-            _kernel_powers = model.kernel.powers[_]
-
-
-        if KERNEL == 'MixtureGaussianSpectral' and MODEL=='GPR':
-            spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
-                tf.convert_to_tensor(model.kernel.kernels[_].means).numpy().ravel(), 
-                tf.convert_to_tensor(model.kernel.kernels[_].bandwidths).numpy().ravel(), 
-                tf.convert_to_tensor(model.kernel.kernels[_].powers).numpy().ravel(), 
-                use_blocks = False)
-
-        elif KERNEL == 'MixtureGaussianSpectral':
-            spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
-                tf.convert_to_tensor(model.kernel.means[:,_]).numpy().ravel(), 
-                tf.convert_to_tensor(model.kernel.bandwidths[:,_]).numpy().ravel(), 
-                tf.convert_to_tensor(model.kernel.powers[_]).numpy().ravel(), 
-                use_blocks = False)
-    
-        else:
-            spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
-                tf.convert_to_tensor(model.kernel.means[:,_]).numpy(), 
-                tf.convert_to_tensor(model.kernel.bandwidths[:,_]).numpy(), 
-                tf.convert_to_tensor(_kernel_powers).numpy(), 
-                use_blocks = True)
+        spectral_block_1a = make_component_spectrum(np.linspace(0, MAXFREQ, 1000), 
+            tf.convert_to_tensor(model.inducing_variable.Z[:,_]).numpy(), 
+            tf.convert_to_tensor(model.inducing_variable[:,_]).numpy(), 
+            tf.convert_to_tensor(_kernel_powers).numpy(), 
+            use_blocks = True)
 
         ax.plot(np.linspace(0, MAXFREQ, 1000), spectral_block_1a, label='SymBand_'+str(_), 
                 linewidth=.8)
+    """
 
-    if MODEL=='SGPR':
-        Z_np = model.inducing_variable.Z.numpy()
-        ax.scatter(Z_np, np.zeros_like(Z_np),
-                s=250, marker="*", alpha=0.95, c = 'cyan',
-                linewidth=1, label = 'Inducing Points')
+    Z_np = model.inducing_variable.Z.numpy()
+    ax.scatter(Z_np, np.zeros_like(Z_np),
+            s=250, marker="*", alpha=0.95, c = 'cyan',
+            linewidth=1, label = 'Inducing Points')
 
 
 def plot_kernel(
     model, kernel, *, optimise: bool = False
 ) -> None:
-    if MODEL=='GPR':
-        _, (samples_ax, prediction_ax, spectrum_ax) = plt.subplots(nrows=3, ncols=1, figsize=(18, 6 * 3))
-        plot_kernel_samples(samples_ax, kernel)
-        plot_kernel_prediction(prediction_ax, model, optimise=optimise)
-        plot_spectrum_blocks(spectrum_ax, model, data_object)
-    elif MODEL=='SGPR':
-        _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_ax, 
-            spectrum_ax) = plt.subplots(nrows=4, ncols=1, figsize=(18, 6 * 4))
-        plot_kernel_samples(samples_ax, kernel)
-        plot_kernel_prediction(prediction_parametric_ax, model, optimise=optimise)
-        plot_kernel_prediction(prediction_non_parametric_ax, model, optimise=optimise, parametric=False)
-        plot_spectrum_blocks(spectrum_ax, model, data_object)
+
+    _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_ax, 
+        spectrum_ax) = plt.subplots(nrows=4, ncols=1, figsize=(18, 6 * 4))
+    plot_kernel_samples(samples_ax, kernel)
+    plot_kernel_prediction(prediction_parametric_ax, model, optimise=optimise)
+    plot_kernel_prediction(prediction_non_parametric_ax, model, optimise=optimise, parametric=False)
+    plot_spectrum_blocks(spectrum_ax, model, data_object)
 
     plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_exploration.png')
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{EXPERIMENT}_exploration.png')
     plt.close()
 
 plot_kernel(model, kern, optimise=False)
@@ -446,37 +293,9 @@ def plot_covariance(model):
     ax2.set_xticklabels([])
     ax2.set_title("Kuu")
 
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_covariances.png')
+    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{EXPERIMENT}_covariances.png')
     plt.close()
 
 plot_covariance(model)
 
 
-
-def plot_complex_gp_covariances(model):
-    """
-    #TODO -- write documentation
-    """
-    _pcov, _cov = model.get_complex_gp_covariances()
-
-    print(_pcov)
-    print(_cov)
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3, 10))
-
-    # Pseudo-covariance local spectrum \mathcal{F}_{c}(xi,xi') -- Complex GP
-    ax1.matshow(_pcov.numpy(), aspect="auto")
-    ax1.set_yticklabels([])
-    ax1.set_xticklabels([])
-    ax1.set_title("Pseudo-covariance")
-
-    # Covariance local spectrum \mathcal{F}_{c}(xi,xi') -- Complex GP
-    ax2.matshow(_cov.numpy(), aspect="auto")
-    ax2.set_yticklabels([])
-    ax2.set_xticklabels([])
-    ax2.set_title("Covariance")
-
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_complex_gp_covariances.png')
-    plt.close()
-
-plot_complex_gp_covariances(model)

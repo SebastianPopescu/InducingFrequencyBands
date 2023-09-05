@@ -15,6 +15,7 @@
 import abc
 from typing import Optional
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from check_shapes import Shape, check_shapes
@@ -100,3 +101,43 @@ class SymRectangularSpectralInducingPoints(RectangularSpectralInducingPointsBase
     given by symmetrical rectangles. Corresponding kernel is the multi sinc kernel.
     """
 
+
+class IFFRectangularSpectralInducingPoints(SpectralInducingVariables):
+    def __init__(self, 
+        M: TensorData,
+        eps: TensorData,
+        name: Optional[str] = None
+        ):
+        """
+        :param kern: contains all the information needed to parametrize 
+        :param means: #TODO -- document param and expected shape as well
+        :param bandwidths: #TODO -- document param and expected shape as well
+        :param variances:#TODO -- focument param and expected shape as well
+        """
+
+        super().__init__(name=name)
+
+        Z = tf.expand_dims(np.arange(M) * eps + eps/2., axis=0)
+        print('inside IFF spectral inducing point')
+        print(Z)
+
+        if not isinstance(Z, (tf.Variable, tfp.util.TransformedVariable)):
+            Z = Parameter(Z, transform=positive())
+        
+        self.Z = Z
+        self.epsilon = eps
+
+
+    @property  # type: ignore[misc]  # mypy doesn't like decorated properties.
+    @check_shapes(
+        "return: []",
+    )
+    def num_inducing(self) -> Optional[tf.Tensor]:
+        return tf.shape(self.Z)[1] * 2
+
+    @property
+    def shape(self) -> Shape:
+        shape = self.Z.shape
+        if not shape:
+            return None
+        return tuple(shape) + (1,)
