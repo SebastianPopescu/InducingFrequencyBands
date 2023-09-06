@@ -24,9 +24,9 @@
 # %matplotlib inline
 import itertools
 import time
-
+import argparse
 import numpy.random as rnd
-
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -51,6 +51,15 @@ tf.random.set_seed(42)
 from copy import deepcopy
 from matplotlib.axes import Axes
 from matplotlib.cm import coolwarm
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--num_inducing", type = int, help="spectral components")
+parser.add_argument("--alpha", type = float, help="window function width")
+args = parser.parse_args()
+
+command = f'mkdir -p ./figures/num_ind_{args.num_inducing}/alpha_{args.alpha}'
+os.system(command)
 
 def func(x):
     return (
@@ -128,18 +137,19 @@ elif EXPERIMENT == 'sunspots':
 if MODEL == 'GPR':
     N_COMPONENTS = 10
 else:
-    N_COMPONENTS = 50
-MAXITER = 25
-UPSCALEALPHA = 1.
+    N_COMPONENTS = args.num_inducing
+
+MAXITER = 100
+#UPSCALEALPHA = 1.
 
 # %% [markdown]
 # # Can choose between 'rbf', 'Periodogram' or 'Neutral'
 #INIT_METHOD = 'rbf'
 INIT_METHOD = 'Periodogram' 
 #INIT_METHOD ='Neutral'
-DELTAS = 1e-1
+#DELTAS = 1e-1
 #NOTE -- alpha needs to be set to a very low value, i.e., close to 0.
-ALPHA = 1e-3
+ALPHA = args.alpha
 
 # NOTE -- in this case this initializes the underlying SMK for Kff time-domain 
 #NEUTRAL = True # Initializes SMK in a non-informative manner
@@ -221,17 +231,18 @@ if MODEL=='GPR':
                                                 alpha = alpha)
                                                 
 else:
+    #alpha init from Tobar
     # to be used for windowing function
-    alpha = 0.5 / ((np.max(X_cond) - 
-                                np.min(X_cond))
-                                /2.)**2  
-    alpha = UPSCALEALPHA * alpha
+    #alpha = 0.5 / ((np.max(X_cond) - 
+    #                            np.min(X_cond))
+    #                            /2.)**2  
+    #alpha = UPSCALEALPHA * alpha
 
     kern = gpflow.kernels.MixtureSpectralGaussianVectorized(
                                                 means = means_np,
                                                 bandwidths = bandwidths_np,
                                                 powers = powers_np,
-                                                alpha = alpha)
+                                                alpha = ALPHA)
 
 if MODEL=='GPR':
     model = gpflow.models.GPR(
@@ -240,15 +251,7 @@ if MODEL=='GPR':
 elif MODEL=='SGPR':
     
     # NOTE -- this is just to get a good initialisation for the locations of Z
-    # I think the periodogram should focus on the right locations            
-    means_np, sth1, sth2 = riemann_approximate_periodogram_initial_components(
-            X_cond.reshape((-1,1)), 
-            Y_cond.ravel(), 
-            [MAXFREQ], 
-            n_components=N_COMPONENTS, 
-            x_interval = [X_cond.max() -  X_cond.min()]
-            )
-    
+    # I think the periodogram should focus on the right locations                
     ind_var = gpflow.inducing_variables.SymRectangularSpectralInducingPoints(kern = kern,
                                                                                 Z = means_np.reshape((-1,))
                                                                                 )
@@ -257,8 +260,8 @@ elif MODEL=='SGPR':
                                 inducing_variable = ind_var, 
                                 noise_variance=1e-3)
 
-optimise = True
-#optimise = False
+#optimise = True
+optimise = False
 
 if optimise:
     #NOTE -- be careful with these deactivations
@@ -417,7 +420,7 @@ def plot_kernel(
         plot_spectrum_blocks(spectrum_ax, model, data_object)
 
     plt.tight_layout()
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_exploration.png')
+    plt.savefig(f'./figures/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_exploration.png')
     plt.close()
 
 plot_kernel(model, kern, optimise=False)
@@ -446,7 +449,7 @@ def plot_covariance(model):
     ax2.set_xticklabels([])
     ax2.set_title("Kuu")
 
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_covariances.png')
+    plt.savefig(f'./figures/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_covariances.png')
     plt.close()
 
 plot_covariance(model)
@@ -476,7 +479,7 @@ def plot_complex_gp_covariances(model):
     ax2.set_xticklabels([])
     ax2.set_title("Covariance")
 
-    plt.savefig(f'./figures/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_complex_gp_covariances.png')
+    plt.savefig(f'./figures/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_complex_gp_covariances.png')
     plt.close()
 
 plot_complex_gp_covariances(model)

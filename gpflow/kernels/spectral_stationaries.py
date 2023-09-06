@@ -25,7 +25,7 @@ from ..base import Parameter, TensorType
 from ..utilities import positive
 from ..utilities.ops import difference_matrix, square_distance, batched_difference_matrix
 from tensorflow_probability.python.bijectors import Exp
-
+from ..base import default_float
 
 ActiveDims = Union[slice, Sequence[int]]
 NormalizedActiveDims = Union[slice, AnyNDArray]
@@ -376,7 +376,7 @@ class SpectralStationary(SpectralKernel):
         )
         self._validate_ard_active_dims(self.means)
 
-        self.alpha = alpha
+        self.alpha = tf.cast(alpha, default_float())
 
     @property
     def ard(self) -> bool:
