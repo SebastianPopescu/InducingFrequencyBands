@@ -58,7 +58,7 @@ parser.add_argument("--num_inducing", type = int, help="spectral components")
 parser.add_argument("--alpha", type = float, help="window function width")
 args = parser.parse_args()
 
-command = f'mkdir -p ./figures/num_ind_{args.num_inducing}/alpha_{args.alpha}'
+command = f'mkdir -p ./figures_troubleshooting/num_ind_{args.num_inducing}/alpha_{args.alpha}'
 os.system(command)
 
 def func(x):
@@ -311,7 +311,9 @@ def plot_kernel_samples(ax: Axes, kernel: gpflow.kernels.SpectralKernel) -> None
 
 
 def plot_kernel_prediction(
-    ax: Axes, model, *, optimise: bool = True, parametric: bool = True,
+    ax: Axes, model, *, optimise: bool = True, 
+    parametric: bool = True,
+    Qff: bool = False
 ) -> None:
     #X = np.array([[-0.5], [0.0], [0.4], [0.5]])
     #Y = np.array([[1.0], [0.0], [0.6], [0.4]])
@@ -327,8 +329,10 @@ def plot_kernel_prediction(
         #f_mean, f_var = model.predict_f_non_parametric(Xplot, full_cov=False)
         if parametric:
             f_mean, f_var = model.predict_f_parametric(Xplot, full_cov=False)
-        else:
-            f_mean, f_var = model.predict_f_non_parametric(Xplot, full_cov=False)
+        elif not parametric and Qff:
+            f_mean, f_var = model.predict_f_non_parametric_Qff(Xplot, full_cov=False)
+        elif not parametric and not Qff:
+            f_mean, f_var = model.predict_f_non_parametric_Kff(Xplot, full_cov=False)
         f_lower = f_mean - 1.96 * np.sqrt(f_var)
         f_upper = f_mean + 1.96 * np.sqrt(f_var)
     else:
@@ -346,8 +350,10 @@ def plot_kernel_prediction(
     #ax.set_ylim(bottom=-2.5, top=2.5)
     if MODEL=='SGPR' and parametric:
         ax.set_title("Example parametric data fit")
-    elif MODEL=='SGPR' and not parametric:
-        ax.set_title("Example non-parametric data fit")
+    elif MODEL=='SGPR' and not parametric and Qff:
+        ax.set_title("Example non-parametric data fit -- Qff")
+    elif MODEL=='SGPR' and not parametric and not Qff:
+        ax.set_title("Example non-parametric data fit -- Kff")
     elif MODEL=='GPR':
         ax.set_title("Example data fit")
 
@@ -400,15 +406,17 @@ def plot_kernel(
         plot_kernel_prediction(prediction_ax, model, optimise=optimise)
         plot_spectrum_blocks(spectrum_ax, model, data_object)
     elif MODEL=='SGPR':
-        _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_ax, 
-            spectrum_ax) = plt.subplots(nrows=4, ncols=1, figsize=(18, 6 * 4))
+        _, (samples_ax, prediction_parametric_ax, prediction_non_parametric_Qff_ax, 
+            prediction_non_parametric_Kff_ax,
+            spectrum_ax) = plt.subplots(nrows=5, ncols=1, figsize=(18, 6 * 5))
         plot_kernel_samples(samples_ax, kernel)
         plot_kernel_prediction(prediction_parametric_ax, model, optimise=optimise)
-        plot_kernel_prediction(prediction_non_parametric_ax, model, optimise=optimise, parametric=False)
+        plot_kernel_prediction(prediction_non_parametric_Kff_ax, model, optimise=optimise, parametric=False, Qff = False)
+        plot_kernel_prediction(prediction_non_parametric_Qff_ax, model, optimise=optimise, parametric=False, Qff = True)
         plot_spectrum_blocks(spectrum_ax, model, data_object)
 
     plt.tight_layout()
-    plt.savefig(f'./figures/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_exploration.png')
+    plt.savefig(f'./figures_troubleshooting/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_exploration.png')
     plt.close()
 
 plot_kernel(model, kern, optimise=False)
@@ -437,7 +445,7 @@ def plot_covariance(model):
     ax2.set_xticklabels([])
     ax2.set_title("Kuu")
 
-    plt.savefig(f'./figures/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_covariances.png')
+    plt.savefig(f'./figures_troubleshooting/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_covariances.png')
     plt.close()
 
 plot_covariance(model)
@@ -469,7 +477,7 @@ def plot_complex_gp_covariances(model):
     ax2.set_xticklabels([])
     ax2.set_title("Covariance")
 
-    plt.savefig(f'./figures/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_complex_gp_covariances.png')
+    plt.savefig(f'./figures_troubleshooting/num_ind_{N_COMPONENTS}/alpha_{ALPHA}/{MODEL}_{KERNEL}_{INIT_METHOD}_{EXPERIMENT}_num_ind_{N_COMPONENTS}_alpha_{ALPHA}_complex_gp_covariances.png')
     plt.close()
 
 plot_complex_gp_covariances(model)
