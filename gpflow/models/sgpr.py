@@ -415,6 +415,105 @@ class SGPR_deprecated(SGPRBase_deprecated):
 
         return self.mean_function(Xnew), var
 
+
+    #FIXME -- make this work eventually
+    #@inherit_check_shapes
+    def predict_f_non_parametric_Kff(
+        self, Xnew: InputData, full_cov: bool = False, full_output_cov: bool = False
+    ) -> MeanAndVariance:
+        """
+        Compute the non-parametric mean and variance of the latent function 
+        at some new points Xnew. 
+        """
+        # could copy into posterior into a fused version
+
+        assert_params_false(self.predict_f, full_output_cov=full_output_cov)
+
+        X_data, Y_data = self.data
+        num_inducing = self.inducing_variable.num_inducing
+        err = Y_data - self.mean_function(X_data)
+        kuf = Kuf(self.inducing_variable, self.kernel, X_data)
+        kuu = Kuu(self.inducing_variable, self.kernel, jitter=default_jitter())
+        Kus = Kuf(self.inducing_variable, self.kernel, Xnew)
+
+        sigma_sq = tf.squeeze(self.likelihood.variance_at(X_data), axis=-1)
+        sigma = tf.sqrt(sigma_sq)
+
+        L = tf.linalg.cholesky(kuu)  # cache alpha, qinv
+        A = tf.linalg.triangular_solve(L, kuf / sigma, lower=True)
+        B = tf.linalg.matmul(A, A, transpose_b=True) + tf.eye(
+            num_inducing, dtype=default_float()
+        )  # cache qinv
+        LB = tf.linalg.cholesky(B)  # cache alpha
+        Aerr = tf.linalg.matmul(A, err / sigma[..., None])
+        c = tf.linalg.triangular_solve(LB, Aerr, lower=True)
+        tmp1 = tf.linalg.triangular_solve(L, Kus, lower=True)
+        tmp2 = tf.linalg.triangular_solve(LB, tmp1, lower=True)
+        mean = tf.linalg.matmul(tmp2, c, transpose_a=True)
+        if full_cov:
+            var = (
+                self.kernel(Xnew)
+            )
+            var = tf.tile(var[None, ...], [self.num_latent_gps, 1, 1])  # [P, N, N]
+        else:
+            var = (
+                self.kernel(Xnew, full_cov=False)
+            )
+            var = tf.tile(var[:, None], [1, self.num_latent_gps])
+
+        return self.mean_function(Xnew), var
+
+
+
+    #FIXME -- make this work eventually
+    #@inherit_check_shapes
+    def predict_f_non_parametric_Qff(
+        self, Xnew: InputData, full_cov: bool = False, full_output_cov: bool = False
+    ) -> MeanAndVariance:
+        """
+        Compute the non-parametric mean and variance of the latent function 
+        at some new points Xnew. 
+        """
+        # could copy into posterior into a fused version
+
+        assert_params_false(self.predict_f, full_output_cov=full_output_cov)
+
+        X_data, Y_data = self.data
+        num_inducing = self.inducing_variable.num_inducing
+        err = Y_data - self.mean_function(X_data)
+        kuf = Kuf(self.inducing_variable, self.kernel, X_data)
+        kuu = Kuu(self.inducing_variable, self.kernel, jitter=default_jitter())
+        Kus = Kuf(self.inducing_variable, self.kernel, Xnew)
+
+        sigma_sq = tf.squeeze(self.likelihood.variance_at(X_data), axis=-1)
+        sigma = tf.sqrt(sigma_sq)
+
+        L = tf.linalg.cholesky(kuu)  # cache alpha, qinv
+        A = tf.linalg.triangular_solve(L, kuf / sigma, lower=True)
+        B = tf.linalg.matmul(A, A, transpose_b=True) + tf.eye(
+            num_inducing, dtype=default_float()
+        )  # cache qinv
+        LB = tf.linalg.cholesky(B)  # cache alpha
+        Aerr = tf.linalg.matmul(A, err / sigma[..., None])
+        c = tf.linalg.triangular_solve(LB, Aerr, lower=True)
+        tmp1 = tf.linalg.triangular_solve(L, Kus, lower=True)
+        tmp2 = tf.linalg.triangular_solve(LB, tmp1, lower=True)
+        mean = tf.linalg.matmul(tmp2, c, transpose_a=True)
+        if full_cov:
+            var = (
+                
+                tf.linalg.matmul(tmp1, tmp1, transpose_a=True)
+            )
+            var = tf.tile(var[None, ...], [self.num_latent_gps, 1, 1])  # [P, N, N]
+        else:
+            var = (
+                
+                tf.reduce_sum(tf.square(tmp1), 0)
+            )
+            var = tf.tile(var[:, None], [1, self.num_latent_gps])
+
+        return self.mean_function(Xnew), var
+
     #FIXME -- make this work eventually
     #@inherit_check_shapes
     def get_covariances(
